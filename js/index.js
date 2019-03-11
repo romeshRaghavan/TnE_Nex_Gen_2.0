@@ -985,13 +985,14 @@ function saveTravelRequestAjax(jsonToSaveTR){
 			  data: JSON.stringify(jsonToSaveTR),
 			  success: function(data) {
 				  if(data.Status=="Failure"){
-				  		j('#loading_Cat').hide();
-					  if(data.hasOwnProperty('IsEntitlementExceed')){				  		
-							setTREntitlementExceedMessage(data,jsonToSaveTR);		 
-						}else{
-							alert(data.Message);
+					  if(data.hasOwnProperty('IsEntitlementExceed')){
+							setTREntitlementExceedMessage(data,jsonToSaveTR);
+							 
 						}
-	  
+					  successMessage = data.Message;
+                      //alert(window.lang.translate(successMessage));
+
+					  
 				  }else if(data.Status=="Success"){
 					  successMessage = data.Message;
 						j('#loading_Cat').hide();
@@ -1339,6 +1340,7 @@ function setPerUnitDetails(transaction, results){
 				$(".dropdown-content").hide(); 
 				fromLocationWayPoint = "";
 				toLocationWayPoint = ""; 
+				//alert(window.localStorage.getItem("MobileMapRole"))
 				if(window.localStorage.getItem("MobileMapRole") == 'true') 
 				{
 					if(window.localStorage.getItem("MapProvider") == "GOOGLEMAP"){
@@ -1552,16 +1554,17 @@ function setDelayMessage(returnJsonData,jsonToBeSend,busExpDetailsArr){
 
 function setTREntitlementExceedMessage(returnJsonData,jsonToBeSend){
 		var msg=returnJsonData.Message+".\nThis voucher has exceeded Entitlements. Do you want to proceed?";
-			var IsEntitlementExceed = confirm(msg);
- 			if (IsEntitlementExceed == true) {
-  				  onConfirm(IsEntitlementExceed,msg,jsonToBeSend);
-  			} else {
-   		 		return false;
-  					}
+	navigator.notification.confirm(msg,
+		function(buttonIndex){
+            onConfirm(buttonIndex, msg,jsonToBeSend);
+        }, 
+		'confirm', 'Yes, No');
+
+	
 	}
 
-function onConfirm(IsEntitlementExceed,errormsg,jsonToBeSend){
-    if (IsEntitlementExceed == true){
+function onConfirm(buttonIndex,errormsg,jsonToBeSend){
+    if (buttonIndex === 1){
     	jsonToBeSend["EntitlementAllowCheck"]=true;
          j('#loading_Cat').show();
 		saveTravelRequestAjax(jsonToBeSend);
@@ -2433,6 +2436,7 @@ $.ajax(settings).done(function (response) {
 
   		setUnitBasedOnResponse(response)
 });
+
 
 }else{
 	unitValue = document.getElementById("expUnit");
@@ -3416,48 +3420,3 @@ function populateMainPage(){
      }
 
 
-//  *****************************************  Upcoming Trips -- Start  **************************************//
-
-function addTrip(){ 
-	window.location.href = 'app/pages/trips-info.html';
-}
-
-function clearDiv(){
-	
-	document.getElementById('firstDiv').style.display='';  
-	document.getElementById('tabTrip1').style.display='none';  
-	document.getElementById('tripdet').style.display='none'; 
-	document.getElementById('tabFlight1').style.display='none'; 
-	document.getElementById('flightdet').style.display='none'; 
-	document.getElementById('tabSuccess').style.display='none'; 
-}
-
-
-function clearDivSync(){
-	document.getElementById('tabTrip1').style.display='none';  
-	document.getElementById('tripdet').style.display='none'; 
-	document.getElementById('tabFlight1').style.display='none'; 
-	document.getElementById('flightdet').style.display='none'; 
-	document.getElementById('tabSuccess').style.display='none'; 
-}
-
-
-
-function clearDivExpense(){
-	document.getElementById('tabTrip1').style.display='none';  
-	document.getElementById('tripdet').style.display='none'; 
-	document.getElementById('tabFlight1').style.display='none'; 
-	document.getElementById('flightdet').style.display='none'; 
-	document.getElementById('tabSuccess').style.display='none'; 
-}
-
-
-function clearDivRequest(){
-	document.getElementById('tabTrip1').style.display='none';  
-	document.getElementById('tripdet').style.display='none'; 
-	document.getElementById('tabFlight1').style.display='none'; 
-	document.getElementById('flightdet').style.display='none'; 
-	document.getElementById('tabSuccess').style.display='none'; 
-}
-
-//  *****************************************  Upcoming Trips -- End  **************************************//
