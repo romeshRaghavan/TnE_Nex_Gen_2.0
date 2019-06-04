@@ -1,14 +1,16 @@
  <script type="text/javascript">
-		var lang = new Lang();
-		lang.dynamic('th', 'js/langpack/th.json');
+        var lang = new Lang();
+        lang.dynamic('th', 'js/langpack/th.json');
         lang.dynamic('ru','js/langpack/russian.json');
         lang.dynamic('ae','js/langpack/arabic.json');
         lang.dynamic('tamil','js/langpack/tamil.json');
         lang.dynamic('hindi','js/langpack/hindi.json');
         lang.dynamic('ka','js/langpack/kannada.json');
-		lang.init({
-			defaultLang: 'en'
-		});
+        lang.dynamic('sd','js/langpack/swidish.json');
+        lang.dynamic('vt','js/langpack/vietnam.json');
+        lang.init({
+            defaultLang: 'en'
+        });
         var smsWatchFlag=window.localStorage.getItem("smsWatchStatus");
         var smartClaimsRole=window.localStorage.getItem("smartClaimsViaSMSOnMobile");
          if(smartClaimsRole){
@@ -18,9 +20,9 @@
         }
 </script>
  <script>
- 	hideTRIcons();
-    hideSmartClaims();
-    hideBusinessExpense();
+    hideTRIcons();
+    //hideBusinessExpense();
+    //hideSmartClaims();
  </script>
 
 <body style="padding:0px; margin:0px; background-color:#fff;font-family:'Open Sans',sans-serif,arial,helvetica,verdana">
@@ -53,9 +55,8 @@
 
             var jssor_1_slider = new $JssorSlider$("jssor_1", jssor_1_options);
 
-            /*responsive code begin*/
-            /*you can remove responsive code if you don't want the slider scales while window resizing*/
             function ScaleSlider() {
+                if(jssor_1_slider.$Elmt.parentNode.clientWidth != null){
                 var refSize = jssor_1_slider.$Elmt.parentNode.clientWidth;
                 if (refSize) {
                     refSize = Math.min(refSize, 1920);
@@ -64,6 +65,7 @@
                 else {
                     window.setTimeout(ScaleSlider, 30);
                 }
+              }
             }
             ScaleSlider();
             $(window).bind("load", ScaleSlider);
@@ -73,16 +75,9 @@
         });
     </script>
     <style>
-        /* jssor slider bullet navigator skin 05 css */
-        /*
-        .jssorb05 div           (normal)
-        .jssorb05 div:hover     (normal mouseover)
-        .jssorb05 .av           (active)
-        .jssorb05 .av:hover     (active mouseover)
-        .jssorb05 .dn           (mousedown)
-        */
         .jssorb05 {
             position: absolute;
+            display: none;
         }
         .jssorb05 div, .jssorb05 div:hover, .jssorb05 .av {
             position: absolute;
@@ -98,17 +93,6 @@
         .jssorb05 .av { background-position: -67px -7px; }
         .jssorb05 .dn, .jssorb05 .dn:hover { background-position: -97px -7px; }
 
-        /* jssor slider arrow navigator skin 22 css */
-        /*
-        .jssora22l                  (normal)
-        .jssora22r                  (normal)
-        .jssora22l:hover            (normal mouseover)
-        .jssora22r:hover            (normal mouseover)
-        .jssora22l.jssora22ldn      (mousedown)
-        .jssora22r.jssora22rdn      (mousedown)
-        .jssora22l.jssora22lds      (disabled)
-        .jssora22r.jssora22rds      (disabled)
-        */
         .jssora22l, .jssora22r {
             display: block;
             position: absolute;
@@ -135,11 +119,7 @@
             <div style="position:absolute;display:block;background:url('img/loading.gif') no-repeat center center;top:0px;left:0px;width:100%;height:100%;"></div>
         </div>
         <div data-u="slides" style="cursor:default;position:relative;top:0px;left:0px;width:1300px;height:500px;overflow:hidden;">
-
-            <div data-p="225.00">
-                <img data-u="image" src="img/red.png" />
-            </div>
-
+            <div data-p="225.00"></div>
         </div>
         <!-- Bullet Navigator -->
         <div data-u="navigator" class="jssorb05" style="bottom:5px;right:5px;" data-autocenter="1">
@@ -152,22 +132,27 @@
     </div>
     <div class="col-md-6 accordions">
          <section class="ac-container">
-               <div id="businessExpenseTab">
-				<label lang="en"onclick="createBusiExpMain();">Business Expense</label>
-				</div>
-				<div id="CategoryTrRoleID">
-				<label  lang="en" onclick="createTravelMain();" style="background: #8fae51 url(images/ar-n.png) no-repeat right;" for="ac-2">Travel Management</label>
-                </div>
-				<div>
-               <label lang="en" onclick="createWallet();" style="background: #8775a7 url(images/ar-n.png) no-repeat right;" for="ac-2">My Receipts Wallet</label>
-				</div>
-             <div id="smartClaimsID">
-               <label lang="en" onclick="viewMessages();" style="background: #b75353 url(images/ar-n.png) no-repeat right;" for="ac-2">Smart Expenses</label>
-                </div>
+           <div id="businessExpenseTab" class="allcats">
+                <span class="claimicon"><i class="fa fa-money" aria-hidden="true"></i></span>
+                <label lang="en"onclick="createBusiExpMain();" style="">
+                    Claim Expense
+                    <h5>Add Expense Claims, Request Advance</h5>
+                </label>
+            </div>
+            <div id="CategoryTrRoleID" class="allcats">
+                <span class="claimicon"><i class="fa fa-plane" aria-hidden="true"></i>
+                </span>
+                <label  lang="en" onclick="createTravelMain();" style="" for="ac-2">
+                    Travel Management
+                    <h5>Add Travel Requests, Travel Settelments </h5>
+                </label>
+            </div>
+            <div class="allcats">
+                <span class="claimicongift"><i class="fa fa-briefcase" aria-hidden="true"></i> </span>
+                <label lang="en" onclick="createWallet();" style="" for="ac-2">
+                My Receipts Wallet</label>
+            </div>
          </section>
     </div>
-<br>
-    <!-- #endregion Jssor Slider End -->
-   <!--  <center><a><p style="color: #19CFEF;font: caption;"> <b lang="en" onclick="showHelpMenu()">Help</b></p></a></center>-->
 </body>
 
