@@ -2,10 +2,10 @@ var j = jQuery.noConflict();
 var defaultPagePath='app/pages/';
 var headerMsg = "Expenzing";
 //var urlPath = 'http://1.255.255.36:13130/TnEV1_0AWeb/WebService/Login/'
-//var WebServicePath ='http://1.255.255.184:8085/NexstepWebService/mobileLinkResolver.service';
-//var WebServicePath = 'http://live.nexstepapps.com:8284/NexstepWebService/mobileLinkResolver.service';
-//var WebServicePath ='http://1.255.255.36:9898/NexstepWebService/mobileLinkResolver.service';
-var WebServicePath ='http://1.255.255.98:8082/NexstepWebService/mobileLinkResolver.service';
+//var WebServicePath ='http://1.255.255.99:8681/NexstepWebService/mobileLinkResolver.service';
+var WebServicePath = 'http://live.nexstepapps.com:8284/NexstepWebService/mobileLinkResolver.service';
+//var WebServicePath ='http://1.255.255.95:8080/NexstepWebService/mobileLinkResolver.service';
+//var WebServicePath ='http://1.255.255.98:8083/NexstepWebService/mobileLinkResolver.service';
 var clickedFlagCar = false;
 var clickedFlagTicket = false;
 var clickedFlagHotel = false;
@@ -985,14 +985,13 @@ function saveTravelRequestAjax(jsonToSaveTR){
 			  data: JSON.stringify(jsonToSaveTR),
 			  success: function(data) {
 				  if(data.Status=="Failure"){
-					  if(data.hasOwnProperty('IsEntitlementExceed')){
-							setTREntitlementExceedMessage(data,jsonToSaveTR);
-							 
+				  		j('#loading_Cat').hide();
+					  if(data.hasOwnProperty('IsEntitlementExceed')){				  		
+							setTREntitlementExceedMessage(data,jsonToSaveTR);		 
+						}else{
+							alert(data.Message);
 						}
-					  successMessage = data.Message;
-                      //alert(window.lang.translate(successMessage));
-
-					  
+	  
 				  }else if(data.Status=="Success"){
 					  successMessage = data.Message;
 						j('#loading_Cat').hide();
@@ -1340,7 +1339,6 @@ function setPerUnitDetails(transaction, results){
 				$(".dropdown-content").hide(); 
 				fromLocationWayPoint = "";
 				toLocationWayPoint = ""; 
-				//alert(window.localStorage.getItem("MobileMapRole"))
 				if(window.localStorage.getItem("MobileMapRole") == 'true') 
 				{
 					if(window.localStorage.getItem("MapProvider") == "GOOGLEMAP"){
@@ -1554,17 +1552,16 @@ function setDelayMessage(returnJsonData,jsonToBeSend,busExpDetailsArr){
 
 function setTREntitlementExceedMessage(returnJsonData,jsonToBeSend){
 		var msg=returnJsonData.Message+".\nThis voucher has exceeded Entitlements. Do you want to proceed?";
-	navigator.notification.confirm(msg,
-		function(buttonIndex){
-            onConfirm(buttonIndex, msg,jsonToBeSend);
-        }, 
-		'confirm', 'Yes, No');
-
-	
+			var IsEntitlementExceed = confirm(msg);
+ 			if (IsEntitlementExceed == true) {
+  				  onConfirm(IsEntitlementExceed,msg,jsonToBeSend);
+  			} else {
+   		 		return false;
+  					}
 	}
 
-function onConfirm(buttonIndex,errormsg,jsonToBeSend){
-    if (buttonIndex === 1){
+function onConfirm(IsEntitlementExceed,errormsg,jsonToBeSend){
+    if (IsEntitlementExceed == true){
     	jsonToBeSend["EntitlementAllowCheck"]=true;
          j('#loading_Cat').show();
 		saveTravelRequestAjax(jsonToBeSend);
@@ -2437,7 +2434,6 @@ $.ajax(settings).done(function (response) {
   		setUnitBasedOnResponse(response)
 });
 
-
 }else{
 	unitValue = document.getElementById("expUnit");
 	unitValue.value = '';
@@ -3046,7 +3042,8 @@ function submitBEWithEA(){
                             jsonEmplAdvanceArr.push(jsonFindEA);
 						    });
                                
-				   }      			 
+				   }      
+				   		 
 						if(accountHeadIdToBeSent!="" && busExpDetailsArr.length>0){
 						  	 sendForApprovalBusinessDetailsWithEa(jsonExpenseDetailsArr,jsonEmplAdvanceArr,busExpDetailsArr,emplAdvanceDetailsArr,accountHeadIdToBeSent);
 						  }
@@ -3113,7 +3110,7 @@ function openNav() {
 }
 
 function closeNav() {
-    document.getElementById("mySidenav").style.width = "0";
+    //document.getElementById("mySidenav").style.width = "0";
 }
 
 
@@ -3371,18 +3368,20 @@ function getExpenseDateFromSMS(input){
 	return (date.getMonth()+1)+"/"+date.getDate()+"/"+date.getFullYear();
 }
 function hideSmartClaims(){
-	if(window.localStorage.getItem("smartClaimsViaSMSOnMobile") == "true"){
+/*	if(window.localStorage.getItem("smartClaimsViaSMSOnMobile") == "true"){
 		document.getElementById('smartClaimsID').style.display="";		
 	}else{
 		document.getElementById('smartClaimsID').style.display="none";
-	}
+	}*/
 }
 
 function hideMultilanguage(){
-	if(window.localStorage.getItem("multiLangInMobile") == "true"){
-		document.getElementById('multiLang').style.display="block";
-	}else{
-		document.getElementById('multiLang').style.display="none";
+		if(window.localStorage.getItem("multiLangInMobile") == "true" && document.getElementById('multiLang') != null){
+			document.getElementById('multiLang').style.display="block";
+		}else{
+			if(document.getElementById('multiLang') != null){
+			document.getElementById('multiLang').style.display="none";
+		}	
 	}
 }
 
@@ -3408,7 +3407,7 @@ function populateMainPage(){
 				synchronizeTRForTS();  
 			  }
                 synchronizeBEMasterData();
-                
+              
                 
             if(window.localStorage.getItem("smartClaimsViaSMSOnMobile") != null && 
                  window.localStorage.getItem("smartClaimsViaSMSOnMobile")){
@@ -3420,3 +3419,48 @@ function populateMainPage(){
      }
 
 
+//  *****************************************  Upcoming Trips -- Start  **************************************//
+
+function addTrip(){ 
+	window.location.href = 'app/pages/trips-info.html';
+}
+
+function clearDiv(){
+	
+	document.getElementById('firstDiv').style.display='';  
+	document.getElementById('tabTrip1').style.display='none';  
+	document.getElementById('tripdet').style.display='none'; 
+	document.getElementById('tabFlight1').style.display='none'; 
+	document.getElementById('flightdet').style.display='none'; 
+	document.getElementById('tabSuccess').style.display='none'; 
+}
+
+
+function clearDivSync(){
+	document.getElementById('tabTrip1').style.display='none';  
+	document.getElementById('tripdet').style.display='none'; 
+	document.getElementById('tabFlight1').style.display='none'; 
+	document.getElementById('flightdet').style.display='none'; 
+	document.getElementById('tabSuccess').style.display='none'; 
+}
+
+
+
+function clearDivExpense(){
+	document.getElementById('tabTrip1').style.display='none';  
+	document.getElementById('tripdet').style.display='none'; 
+	document.getElementById('tabFlight1').style.display='none'; 
+	document.getElementById('flightdet').style.display='none'; 
+	document.getElementById('tabSuccess').style.display='none'; 
+}
+
+
+function clearDivRequest(){
+	document.getElementById('tabTrip1').style.display='none';  
+	document.getElementById('tripdet').style.display='none'; 
+	document.getElementById('tabFlight1').style.display='none'; 
+	document.getElementById('flightdet').style.display='none'; 
+	document.getElementById('tabSuccess').style.display='none'; 
+}
+
+//  *****************************************  Upcoming Trips -- End  **************************************//
