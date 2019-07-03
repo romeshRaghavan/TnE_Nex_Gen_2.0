@@ -1185,3 +1185,9 @@ div.image {
     width: 60% !important;
     margin-left: 6px;
 }
+
+#errorMsg1 {
+    font-size: 13px;
+    color: #960e0e;
+    font-weight: 500;
+}

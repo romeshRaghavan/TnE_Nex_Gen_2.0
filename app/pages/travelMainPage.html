@@ -17,10 +17,10 @@
     <div class="sap_tabs">
         <div id="horizontalTab">
             <ul class="resp-tabs-list">
-                <li lang="en" class="resp-tab-item " aria-controls="tab_item-0" role="tab" onclick="addHeader(); clearDiv();  ">Travel Home</li>
-                <li lang="en" class="active" class="resp-tab-item resp-tab-active" aria-controls="tab_item-1" role="tab" onclick="addHeader(); clearDivRequest();"> Travel Request</li>
-                <li lang="en" class="resp-tab-item " aria-controls="tab_item-2" role="tab" onclick="addHeader(); clearDivExpense();">Travel Settlement</li>
-                <li lang="en" class="resp-tab-item " aria-controls="tab_item-3" role="tab" onclick="fetchTravelSettlementExpFromMain(); clearDivSync();">Travel Sync</li>
+                <li lang="en" class="resp-tab-item " aria-controls="tab_item-0" role="tab" onclick="addHeader(); clearDiv();">Travel <br> Home</li>
+                <li lang="en" class="active" class="resp-tab-item resp-tab-active" aria-controls="tab_item-1" role="tab" onclick="addHeader(); clearDivRequest();"> Travel <br> Request</li>
+                <li lang="en" class="resp-tab-item " aria-controls="tab_item-2" role="tab" onclick="addHeader(); clearDivExpense();">Travel <br> Settlement</li>
+                <li lang="en" class="resp-tab-item " aria-controls="tab_item-3" role="tab" onclick="fetchTravelSettlementExpFromMain(); clearDivSync();">Travel <br> Sync</li>
 
             </ul>
             <div class="resp-tabs-container">
@@ -73,7 +73,6 @@
                                 <h1 lang="en">Add Travel Request</h1>
                                 <div class="expenseform clearfix" data-role="page" id="page1">
                                     <ul>
-                                        <p id="delayDaysMsgArea"><span id="errorMsg"></span></p>
                                         <li>
                                             <input lang="en" id="travelTitle" type="text" placeholder="Travel Title">
                                         </li>
@@ -114,11 +113,6 @@
                                         <table class="table table-responsive">
                                             <tr>
                                                 <td colspan="2">
-                                                    <p id="overlapMsgArea"><span id="errorMsg"></span></p>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td colspan="2">
                                                     <div class="well datetime">
                                                         <input lang="en" type="text" id="selectDate_One" class="span2 dp1" readonly="true" placeholder="Select Date">
                                                     </div>
@@ -126,6 +120,15 @@
                                                     <div class="datetime1">
                                                         <input lang="en" class="timepicker1" id="selectTime_One" type="text" name="timepicker1" readonly="true" placeholder="Select Time" />
                                                     </div>
+                                                </td>
+                                            </tr>
+                                             <tr>
+                                                <td colspan="2">
+                                                    <p id="delayDaysMsgArea"><span id="errorMsg1">
+                                                    </span></p>
+                                                    <br>
+                                                    <p id="overlapMsgArea"><span id="errorMsg1">
+                                                    </span></p>
                                                 </td>
                                             </tr>
                                             <tr>
@@ -170,11 +173,6 @@
                                         <table class="table table-responsive">
                                             <tr>
                                                 <td colspan="2">
-                                                    <p id="overlapMsgRoundTripArea"><span id="errorMsg"></span></p>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td colspan="2">
                                                     <div class="well datetime">
                                                         <input lang="en" type="text" id="selectDate_Three" class="span2 dp1" readonly="true" placeholder="Select Date">
                                                     </div>
@@ -196,6 +194,13 @@
                                                 </td>
                                             </tr>
                                             <tr>
+                                                <td colspan="2">
+                                                    <p id="delayDaysMsgRoundArea"><span id="errorMsg1"></span></p>
+                                                    <br>
+                                                    <p id="overlapMsgRoundTripArea"><span id="errorMsg1"></span></p>
+                                                </td>
+                                            </tr>
+                                            <tr>
                                                 <td lang="en">Mode</td>
                                                 <td>
                                                     <input lang="en" placeholder="Travel Mode" id="roundTripMode" type="hidden" style="width: 98%">
@@ -208,7 +213,7 @@
                                                 </td>
                                             </tr>
                                         </table>
-                                        <p><font lang="en" face="verdana" size="1" color="green">Specify only if you require travel desk to book any of these 3:</font></p>
+                                        <p><font lang="en" face="verdana" size="2" color="green">Specify only if you require travel desk to book any of these 3:</font></p>
                                         <table class="table table-responsive">
                                             <tr>
                                                 <td id="carRoundDisabled" style="width: 100px;"><img src="images/oldcarbnw.png" onclick="setBooleanValueCarRound();"></td>
@@ -411,6 +416,7 @@
                                     $('#advanceReq').show();
                                 } else {
                                     $('#advanceReq').hide();
+                                    document.getElementById('advanceReq').value = '';
                                 }
                             });
 

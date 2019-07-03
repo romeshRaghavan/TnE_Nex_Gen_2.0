@@ -2512,7 +2512,7 @@ a.hvr-hollow:active {
     .resp-tab-item {
         font-size: 13px;
         width: 25%;
-        padding: 17px 17px;
+        padding: 17px 1px;
     }
     .skill-inner {
         padding: 1em;
@@ -2647,7 +2647,7 @@ a.hvr-hollow:active {
     .resp-tab-item {
         font-size: 13px;
         width: 25%;
-        padding: 17px 17px;
+        padding: 17px 1px;
     }
     .skill-inner {
         padding: 2em;
@@ -2879,7 +2879,7 @@ a.hvr-hollow:active {
     .resp-tab-item {
         font-size: 13px;
         width: 25%;
-        padding: 17px 17px;
+        padding: 17px 1px;
     }
     .skill-inner {
         padding: 2em;
@@ -3420,7 +3420,7 @@ a.hvr-hollow:active {
     .resp-tab-item {
         font-size: 13px;
         width: 25%;
-        padding: 17px 17px;
+        padding: 17px 1px;
     }
     a.hvr-bounce-to-bottom2 {
         padding: 1em 1em;
@@ -3513,7 +3513,7 @@ a.hvr-hollow:active {
     .resp-tab-item {
         font-size: 11px;
         width: 25%;
-        padding: 17px 0px;
+        padding: 17px;
     }
     .twitter {
         margin-top: 22em;
