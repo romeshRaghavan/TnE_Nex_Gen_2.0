@@ -1285,6 +1285,7 @@ function resetOneTrip() {
     document.getElementById('selectTime_One').value = "";
     j('#overlapMsgArea').children('span').text("");
     j('#overlapMsgRoundTripArea').children('span').text("");
+    j('#delayDaysMsgRoundArea').children('span').text("");
 }
 
 function resetRoundTrip() {
@@ -1300,6 +1301,7 @@ function resetRoundTrip() {
     document.getElementById('selectTime_Three').value = "";
     j('#overlapMsgArea').children('span').text("");
     j('#overlapMsgRoundTripArea').children('span').text("");
+     j('#delayDaysMsgRoundArea').children('span').text("");
 }
 
 function onloadTimePicker() {

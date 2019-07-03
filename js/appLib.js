@@ -4162,11 +4162,11 @@
                      for (i = 0; i < results.rows.length; i++) {
                          var row = results.rows.item(i);
                          noOfDays = row.noOfDays;
-                         console.log("daysDiff : " + daysDiff + "noOfDays  :" + noOfDays);
+                         console.log("daysDiff : " + daysDiff + "noOfDays  : " + noOfDays);
                          if (daysDiff <= noOfDays && daysDiff > -7) {
                              expMsg = expMsg + "This is last minute trip request! You have crossed the time limit of " + noOfDays + " days for trip request.";
                              j('#delayDaysMsgArea').children('span').text(expMsg);
-
+                              j('#delayDaysMsgRoundArea').children('span').text(expMsg);
                          }
                      }
                  });
