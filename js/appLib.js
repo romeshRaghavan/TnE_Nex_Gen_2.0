@@ -4125,8 +4125,6 @@
 
      var selected_Date = $("#selectDate_One").datepicker("getDate");
 
-     console.log("dateSelected : " + selected_Date + " current_Date : " + current_Date);
-
      // get days
      var days = (current_Date - selected_Date) / (1000 * 60 * 60 * 24);
 
@@ -4139,8 +4137,6 @@
      current_Date.setHours(0, 0, 0, 0);
 
      var selected_Date = $("#selectDate_Three").datepicker("getDate");
-
-     console.log("dateSelected : " + selected_Date + " current_Date : " + current_Date);
 
      // get days
      var days = (current_Date - selected_Date) / (1000 * 60 * 60 * 24);
@@ -4162,20 +4158,37 @@
                      for (i = 0; i < results.rows.length; i++) {
                          var row = results.rows.item(i);
                          noOfDays = row.noOfDays;
-                         console.log("daysDiff : " + daysDiff + "noOfDays  : " + noOfDays);
+
                          if (daysDiff <= noOfDays && daysDiff > -7) {
-                             expMsg = expMsg + "This is last minute trip request! You have crossed the time limit of " + noOfDays + " days for trip request.";
+
+                            j('#validationMsgBox').show();
+                            j('#validationMsgBoxRoundTrip').show();
+                            
+                             expMsg = "This is last minute trip request! You have crossed the time limit of " + noOfDays + " days for trip request.";
+                             
+                             document.getElementById("delayDaysMsgRoundArea").style.display = "";
+                             document.getElementById("delayDaysMsgArea").style.display = "";  
+
                              j('#delayDaysMsgArea').children('span').text(expMsg);
-                              j('#delayDaysMsgRoundArea').children('span').text(expMsg);
+                             j('#delayDaysMsgRoundArea').children('span').text(expMsg);
+
+                             document.getElementById("selectDate_One").style.borderColor = "#960e0e";
+                             document.getElementById("selectDate_Three").style.borderColor = "#960e0e";
+
+                         }else{
+                             document.getElementById("selectDate_One").style.borderColor = "#cccccc";
+                             document.getElementById("selectDate_Three").style.borderColor = "#cccccc";
+                             j('#delayDaysMsgArea').children('span').text(expMsg);
+                             j('#delayDaysMsgRoundArea').children('span').text(expMsg);
+                             disableTableRow();
                          }
+                         
                      }
                  });
          });
      } else {
          alert(window.lang.translate('Database not found, your browser does not support web sql!'));
      }
-
-     j('#delayDaysMsgArea').children('span').text(expMsg);
  }
 
  // *********************************  Travel Last Min Trip Validation -- End ******************************************//
@@ -4207,6 +4220,15 @@
  }
 
  function dateOverLapMsg(jsonToSaveTR) {
+    j('#overlapMsgRoundTripArea').children('span').text("");
+    j('#overlapMsgArea').children('span').text("");
+    
+    var spanValueErrorMsg1 = document.getElementById('errorMsg1').innerHTML;
+    var spanValueErrorMsg2 = document.getElementById('errorMsg2').innerHTML;
+
+    var spanValueErrorMsg3 = document.getElementById('errorMsg3').innerHTML;
+    var spanValueErrorMsg4 = document.getElementById('errorMsg4').innerHTML;
+
      j.ajax({
          url: window.localStorage.getItem("urlPath") + "ValidateTravelVoucherForDateRange",
          type: 'POST',
@@ -4215,17 +4237,39 @@
          data: JSON.stringify(jsonToSaveTR),
          success: function(data) {
              if (data.Status == "Y") {
-                 var overlapMsg = data.Message;
+                var overlapMsg = data.Message;
                  if (overlapMsg != "") {
+                     j('#validationMsgBox').show();
+                     j('#validationMsgBoxRoundTrip').show();
+
+                     document.getElementById("selectDate_One").style.borderColor = "#960e0e";
+                     document.getElementById("selectDate_Two").style.borderColor = "#960e0e";
+                     document.getElementById("selectDate_Three").style.borderColor = "#960e0e";
+
                      j('#overlapMsgArea').children('span').text(overlapMsg);
                      j('#overlapMsgRoundTripArea').children('span').text(overlapMsg);
 
                  }
              } else {
-                 j('#overlapMsgArea').children('span').text("");
-                 j('#overlapMsgRoundTripArea').children('span').text("");
-                 requestRunning = false;
+
+                if(spanValueErrorMsg1 == "" && spanValueErrorMsg2 == "" ){
+                         document.getElementById("selectDate_One").style.borderColor = "#cccccc";   
+                }
+                
+                if(spanValueErrorMsg3 == ""){
+                     document.getElementById("selectDate_Three").style.borderColor = "#cccccc";
+                }
+
+                if(spanValueErrorMsg4 == ""){
+                    document.getElementById("selectDate_Two").style.borderColor = "#cccccc";
+
+                }
+                j('#overlapMsgArea').children('span').text("");
+                j('#overlapMsgRoundTripArea').children('span').text("");
+
+                requestRunning = false;
              }
+              disableTableRow();
          },
          error: function(data) {
              requestRunning = false;
@@ -4255,6 +4299,30 @@
 
      }
      return true;
+ }
+
+ function disableTableRow(){
+    var spanValueErrorMsg1 = document.getElementById('errorMsg1').innerHTML;
+    var spanValueErrorMsg2 = document.getElementById('errorMsg2').innerHTML;
+
+    var spanValueErrorMsg3 = document.getElementById('errorMsg3').innerHTML;
+    var spanValueErrorMsg4 = document.getElementById('errorMsg4').innerHTML;
+
+    if(spanValueErrorMsg1 == ""){
+        document.getElementById("delayDaysMsgArea").style.display = "none";   
+    }
+
+    if(spanValueErrorMsg3 == ""){
+        document.getElementById("delayDaysMsgRoundArea").style.display = "none";   
+    }
+
+    if(spanValueErrorMsg3 == ""  && spanValueErrorMsg4 == "" ){
+        j("#validationMsgBoxRoundTrip").hide();
+    }
+
+    if(spanValueErrorMsg1 == "" && spanValueErrorMsg2 == ""){
+        j("#validationMsgBox").hide();
+    }
  }
 
  // *********************************  Travel Date For Overlap Validation -- End ******************************************//
@@ -4404,3 +4472,72 @@ function resetAmountAndEntitlementMsg(){
 }
 
 // *********************************  Travel Settelment Entitlement -- End ******************************************//
+
+// *********************************  Travel Settelment Send For Appoval -- Start ******************************************//
+function tripDetails() {
+    var travelRequestId = j("#travelRequestName").select2('data').id;
+
+    var jsonToPopulateTRDetails = new Object();
+    jsonToPopulateTRDetails["TravelRequestId"] = travelRequestId;
+    populateTravelRequestDetailsAjax(jsonToPopulateTRDetails);
+}
+
+function populateTravelRequestDetailsAjax(jsonToPopulateTRDetails) {
+    var pageRefSuccess = defaultPagePath + 'success.html';
+    var pageRefFailure = defaultPagePath + 'failure.html';
+    j('#loading_Cat').show();
+    j.ajax({
+        url: window.localStorage.getItem("urlPath") + "SyncTravelRequestDetail",
+        type: 'POST',
+        dataType: 'json',
+        crossDomain: true,
+        data: JSON.stringify(jsonToPopulateTRDetails),
+        success: function(data) {
+            if (data.Status == "Success") {
+                var travelDetailArray = data.TravelDetailArray;
+                setTRdetailsForSettelment(travelDetailArray);
+
+                j('#loading_Cat').hide();
+                j('#mainContainer').load(pageRefSuccess);
+                appPageHistory.push(pageRefSuccess);
+            } else {
+                successMessage = "Error: Oops something is wrong, Please Contact System Administer";
+                j('#loading_Cat').hide();
+                j('#mainContainer').load(pageRefFailure);
+                appPageHistory.push(pageRefFailure);
+            }
+        },
+        error: function(data) {
+            successMessage = "Error: Oops something is wrong, Please Contact System Administer";
+            j('#loading_Cat').hide();
+            j('#mainContainer').load(pageRefFailure);
+            appPageHistory.push(pageRefFailure);
+        }
+    });
+}
+
+function setTRdetailsForSettelment(travelDetailArray) {
+
+    if (travelDetailArray != null && travelDetailArray.length > 0) {
+        for (var i = 0; i < travelDetailArray.length; i++) {
+            var detailArr = new Array();
+            detailArr = travelDetailArray[i];
+            var exp_date = detailArr.ExpDate;
+            var travelRequestId = detailArr.TravelReqId;
+            var exp_name_id = detailArr.ExpNameId;
+            var exp_narration = detailArr.Narration;
+            var exp_unit = detailArr.Unit;
+            var exp_amt = detailArr.Amount;
+            var currency_id = detailArr.ExpCurrencyId;
+            var travelMode_id = detailArr.TravelModeId;
+            var travelCategory_id = detailArr.TravelCatgId;
+            var cityTown_id = detailArr.CityTownId;
+            var file = detailArr.FileAttachment;
+
+            t.executeSql("INSERT INTO travelSettleExpDetails  (expDate, travelRequestId,expNameId,expNarration, expUnit,expAmt,currencyId,travelModeId,travelCategoryId,cityTownId,tsExpAttachment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [exp_date, travelRequestId, exp_name_id, exp_narration, exp_unit, exp_amt, currency_id, travelMode_id, travelCategory_id, cityTown_id, file]);
+        }
+    }
+}
+
+    // *********************************  Travel Settelment Send For Appoval -- End ******************************************//
+

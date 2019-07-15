@@ -1286,6 +1286,11 @@ function resetOneTrip() {
     j('#overlapMsgArea').children('span').text("");
     j('#overlapMsgRoundTripArea').children('span').text("");
     j('#delayDaysMsgRoundArea').children('span').text("");
+    j('#validationMsgBox').hide();
+    j('#validationMsgBoxRoundTrip').hide();
+    document.getElementById("selectDate_One").style.borderColor = "#cccccc";
+    document.getElementById("selectDate_Two").style.borderColor = "#cccccc";
+    document.getElementById("selectDate_Three").style.borderColor = "#cccccc";
 }
 
 function resetRoundTrip() {
@@ -1301,7 +1306,12 @@ function resetRoundTrip() {
     document.getElementById('selectTime_Three').value = "";
     j('#overlapMsgArea').children('span').text("");
     j('#overlapMsgRoundTripArea').children('span').text("");
-     j('#delayDaysMsgRoundArea').children('span').text("");
+    j('#delayDaysMsgRoundArea').children('span').text("");
+    j('#validationMsgBox').hide();
+    j('#validationMsgBoxRoundTrip').hide();
+    document.getElementById("selectDate_One").style.borderColor = "#cccccc";
+    document.getElementById("selectDate_Two").style.borderColor = "#cccccc";
+    document.getElementById("selectDate_Three").style.borderColor = "#cccccc";
 }
 
 function onloadTimePicker() {
