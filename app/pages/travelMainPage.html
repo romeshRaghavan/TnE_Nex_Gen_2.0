@@ -90,7 +90,7 @@
                                             <input lang="en" id="toCitytown" placeholder="To Location" type="hidden" style="width: 98%">
                                         </li>
                                         <li>
-                                            <label class="advAmount" style="margin-top:2px !important;">Advance Amount </label>
+                                            <label class="advAmount" style="margin-top:2px !important;">Advance Required? </label>
                                             <span>
                                                 <input type="radio" name="type" value="Y"> Yes
                                                 <input type="radio" name="type" value="N" checked> No
@@ -112,8 +112,8 @@
                                     <div class="tab-pane fade in active" id="service-one">
                                         <table class="table table-responsive">
                                             <tr>
-                                                <td colspan="2">
-                                                    <div class="well datetime">
+                                                <td colspan="2" style="border-top: none;">
+                                                    <div class="datetime">
                                                         <input lang="en" type="text" id="selectDate_One" class="span2 dp1" readonly="true" placeholder="Select Date">
                                                     </div>
 
@@ -122,24 +122,23 @@
                                                     </div>
                                                 </td>
                                             </tr>
-                                             <tr>
-                                                <td colspan="2">
-                                                    <p id="delayDaysMsgArea"><span id="errorMsg1">
+                                             <tr id = "validationMsgBox" style="display: none;">
+                                                <td colspan="2" style="border-top: none;">
+                                                    <p id="delayDaysMsgArea" style="padding-bottom: 12px;"><span id="errorMsg1">
                                                     </span></p>
-                                                    <br>
-                                                    <p id="overlapMsgArea"><span id="errorMsg1">
+                                                    <p id="overlapMsgArea"><span id="errorMsg2">
                                                     </span></p>
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td lang="en">Mode</td>
-                                                <td>
+                                                <td lang="en" style="border-top: none;">Mode</td>
+                                                <td style="border-top: none;">
                                                     <input lang="en" placeholder="Travel Mode" id="travelMode" type="hidden" style="width: 98%">
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td lang="en">Class</td>
-                                                <td>
+                                                <td lang="en" style="border-top: none;">Class</td>
+                                                <td style="border-top: none;">
                                                     <input lang="en" placeholder="Travel Category" id="travelCategory" type="hidden" style="width: 98%">
                                                 </td>
                                             </tr>
@@ -172,8 +171,8 @@
                                     <div class="tab-pane fade" id="service-two">
                                         <table class="table table-responsive">
                                             <tr>
-                                                <td colspan="2">
-                                                    <div class="well datetime">
+                                                <td colspan="2" style="border-top: none;">
+                                                    <div class="datetime">
                                                         <input lang="en" type="text" id="selectDate_Three" class="span2 dp1" readonly="true" placeholder="Select Date">
                                                     </div>
 
@@ -183,8 +182,8 @@
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td colspan="2">
-                                                    <div class="well datetime">
+                                                <td colspan="2" style="border-top: none;">
+                                                    <div class="datetime">
                                                         <input lang="en" type="text" id="selectDate_Two" class="span2 dp1" readonly="true" placeholder="Select Date">
                                                     </div>
 
@@ -193,22 +192,22 @@
                                                     </div>
                                                 </td>
                                             </tr>
-                                            <tr>
-                                                <td colspan="2">
-                                                    <p id="delayDaysMsgRoundArea"><span id="errorMsg1"></span></p>
-                                                    <br>
-                                                    <p id="overlapMsgRoundTripArea"><span id="errorMsg1"></span></p>
+                                            <tr id = "validationMsgBoxRoundTrip" style="display: none;">
+                                                <td colspan="2" style="border-top: none;">
+                                                    <p id="delayDaysMsgRoundArea" style="padding-bottom: 12px;"><span id="errorMsg3"></span></p>
+                                                
+                                                    <p id="overlapMsgRoundTripArea"><span id="errorMsg4"></span></p>
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td lang="en">Mode</td>
-                                                <td>
+                                                <td lang="en" style="border-top: none;">Mode</td>
+                                                <td style="border-top: none;">
                                                     <input lang="en" placeholder="Travel Mode" id="roundTripMode" type="hidden" style="width: 98%">
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td lang="en">Class</td>
-                                                <td>
+                                                <td lang="en" style="border-top: none;">Class</td>
+                                                <td style="border-top: none;">
                                                     <input lang="en" placeholder="Travel Category" id="roundTripCategory" type="hidden" style="width: 98%">
                                                 </td>
                                             </tr>

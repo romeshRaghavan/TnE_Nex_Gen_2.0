@@ -1182,11 +1182,11 @@ div.image {
 }
 
 .advAmountfield {
-    width: 60% !important;
+    width: 50% !important;
     margin-left: 6px;
 }
 
-#errorMsg1 {
+#errorMsg1, #errorMsg2, #errorMsg3, #errorMsg4 {
     font-size: 13px;
     color: #960e0e;
     font-weight: 500;

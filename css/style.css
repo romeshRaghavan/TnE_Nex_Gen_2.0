@@ -2508,6 +2508,7 @@ a.hvr-hollow:active {
     .sap_tabs p {
         font-size: 0.9em;
         padding: 0em 0em;
+        margin-bottom: 8px;
     }
     .resp-tab-item {
         font-size: 13px;
