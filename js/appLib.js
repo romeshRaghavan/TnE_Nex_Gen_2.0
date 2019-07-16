@@ -4476,18 +4476,40 @@ function resetAmountAndEntitlementMsg(){
 // *********************************  Travel Settelment Send For Appoval -- Start ******************************************//
 function tripDetails() {
     var travelRequestId = j("#travelRequestName").select2('data').id;
-
+    alert("travelRequestId : " + travelRequestId);
     var jsonToPopulateTRDetails = new Object();
     jsonToPopulateTRDetails["TravelRequestId"] = travelRequestId;
-    populateTravelRequestDetailsAjax(jsonToPopulateTRDetails);
+    checkTRDetailsExist(travelRequestId,jsonToPopulateTRDetails);
+}
+
+function checkTRDetailsExist(travelRequestId,jsonToPopulateTRDetails) {
+    if (mydb) {
+        mydb.transaction(function(t) {
+            t.executeSql("Select * from travelSettleExpDetails where travelRequestId = '" + travelRequestId + "'", [],
+                function(transaction, results) {
+                    alert("results.rows.length : " + results.rows.length);
+                    var noOfRows = results.rows.length;
+                    if (noOfRows == 0) {
+                          populateTravelRequestDetailsAjax(jsonToPopulateTRDetails);
+                    } else {
+                         return false;
+                    }
+
+                });
+        });
+    } else {
+        alert(window.lang.translate('Database not found, your browser does not support web sql!'));
+    }
+
 }
 
 function populateTravelRequestDetailsAjax(jsonToPopulateTRDetails) {
+    alert("populateTravelRequestDetailsAjax :");
     var pageRefSuccess = defaultPagePath + 'success.html';
     var pageRefFailure = defaultPagePath + 'failure.html';
-    j('#loading_Cat').show();
+
     j.ajax({
-        url: window.localStorage.getItem("urlPath") + "SyncTravelRequestDetail",
+        url: window.localStorage.getItem("urlPath") + "FetchDetailLinesForTS",
         type: 'POST',
         dataType: 'json',
         crossDomain: true,
@@ -4497,47 +4519,42 @@ function populateTravelRequestDetailsAjax(jsonToPopulateTRDetails) {
                 var travelDetailArray = data.TravelDetailArray;
                 setTRdetailsForSettelment(travelDetailArray);
 
-                j('#loading_Cat').hide();
-                j('#mainContainer').load(pageRefSuccess);
-                appPageHistory.push(pageRefSuccess);
+                requestRunning = false;
             } else {
                 successMessage = "Error: Oops something is wrong, Please Contact System Administer";
-                j('#loading_Cat').hide();
-                j('#mainContainer').load(pageRefFailure);
-                appPageHistory.push(pageRefFailure);
+                requestRunning = false;
             }
         },
         error: function(data) {
-            successMessage = "Error: Oops something is wrong, Please Contact System Administer";
-            j('#loading_Cat').hide();
-            j('#mainContainer').load(pageRefFailure);
-            appPageHistory.push(pageRefFailure);
+            requestRunning = false;
         }
     });
 }
 
 function setTRdetailsForSettelment(travelDetailArray) {
 
-    if (travelDetailArray != null && travelDetailArray.length > 0) {
-        for (var i = 0; i < travelDetailArray.length; i++) {
-            var detailArr = new Array();
-            detailArr = travelDetailArray[i];
-            var exp_date = detailArr.ExpDate;
-            var travelRequestId = detailArr.TravelReqId;
-            var exp_name_id = detailArr.ExpNameId;
-            var exp_narration = detailArr.Narration;
-            var exp_unit = detailArr.Unit;
-            var exp_amt = detailArr.Amount;
-            var currency_id = detailArr.ExpCurrencyId;
-            var travelMode_id = detailArr.TravelModeId;
-            var travelCategory_id = detailArr.TravelCatgId;
-            var cityTown_id = detailArr.CityTownId;
-            var file = detailArr.FileAttachment;
+    alert("travel detail : " + JSON.stringify(travelDetailArray));
+    mydb.transaction(function(t) {
+        if (travelDetailArray != null && travelDetailArray.length > 0) {
+            for (var i = 0; i < travelDetailArray.length; i++) {
+                var detailArr = new Array();
+                detailArr = travelDetailArray[i];
+                var exp_date = detailArr.ExpDate;
+                var travelRequestId = detailArr.TravelReqId;
+                var exp_name_id = detailArr.ExpNameId;
+                var exp_narration = detailArr.Narration;
+                var exp_unit = detailArr.Unit;
+                var exp_amt = detailArr.Amount;
+                var currency_id = detailArr.ExpCurrencyId;
+                var travelMode_id = detailArr.TravelModeId;
+                var travelCategory_id = detailArr.TravelCatgId;
+                var cityTown_id = detailArr.CityTownId;
+                var file = "";
 
-            t.executeSql("INSERT INTO travelSettleExpDetails  (expDate, travelRequestId,expNameId,expNarration, expUnit,expAmt,currencyId,travelModeId,travelCategoryId,cityTownId,tsExpAttachment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [exp_date, travelRequestId, exp_name_id, exp_narration, exp_unit, exp_amt, currency_id, travelMode_id, travelCategory_id, cityTown_id, file]);
+                t.executeSql("INSERT INTO travelSettleExpDetails  (expDate, travelRequestId,expNameId,expNarration, expUnit,expAmt,currencyId,travelModeId,travelCategoryId,cityTownId,tsExpAttachment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [exp_date, travelRequestId, exp_name_id, exp_narration, exp_unit, exp_amt, currency_id, travelMode_id, travelCategory_id, cityTown_id, file]);
+            }
         }
-    }
+    });
 }
-
-    // *********************************  Travel Settelment Send For Appoval -- End ******************************************//
+ // *********************************  Travel Settelment Send For Appoval -- End ******************************************//
 
