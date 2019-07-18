@@ -1036,8 +1036,10 @@ function saveTravelRequestAjax(jsonToSaveTR) {
         crossDomain: true,
         data: JSON.stringify(jsonToSaveTR),
         success: function(data) {
+            alert("111 :"+data.Status);
             if (data.Status == "Failure") {
                 j('#loading_Cat').hide();
+                alert("222 : "+data.hasOwnProperty('IsEntitlementExceed'));
                 if (data.hasOwnProperty('IsEntitlementExceed')) {
                     setTREntitlementExceedMessage(data, jsonToSaveTR);
                 } else {
