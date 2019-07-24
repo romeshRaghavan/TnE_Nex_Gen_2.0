@@ -229,6 +229,7 @@
                  t.executeSql("INSERT INTO businessExpDetails (expDate, accHeadId,expNameId,expFromLoc, expToLoc, expNarration, expUnit,expAmt,currencyId,isEntitlementExceeded,busExpAttachment,wayPointunitValue) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [exp_date, acc_head_id, exp_name_id, exp_from_loc, exp_to_loc, exp_narration, exp_unit, exp_amt, currency_id, entitlement_exceeded, file, way_points]);
 
                  if (status == "0") {
+                     alert("wer status : "+status)
 
                      document.getElementById('expDate').value = "";
                      document.getElementById('expFromLoc').value = "";
@@ -391,7 +392,6 @@
  var jsonExpenseDetailsArr = [];
 
  function fetchExpenseClaim() {
-
      mytable = j('<table></table>').attr({
          id: "source",
          class: ["table", "table-striped", "table-bordered"].join(' ')
@@ -1314,7 +1314,15 @@
      window.localStorage.setItem("BudgetingStatus", val.BudgetingStatus);
      window.localStorage.setItem("UnitId", val.UnitId);
      window.localStorage.setItem("MapProvider", val.MapProvider);
-     //window.localStorage.setItem("mobileEC",val.mobileEC);
+
+//***************************** Profile Image -- Start *******************************************************//
+
+
+/*    profileImg = val.ProfileImageData;
+    console.log("profileImgprofileImg : "+profileImg);*/
+
+//***************************** Profile Image -- End*******************************************************//
+
      //For Mobile Google Map Role Start
      //End
      if (!val.hasOwnProperty('MobileMapRole')) {
@@ -1942,6 +1950,7 @@
  }
 
  function fetchEmployeeAdvance() {
+
      mytable = j('<table></table>').attr({
          id: "source",
          class: ["table", "table-striped", "table-bordered"].join(' ')
@@ -4030,7 +4039,7 @@
 
      if (exp_from_loc == null) {
          exp_from_loc = "";
-         alert("in exp_from_loc :" + exp_from_loc);
+         //alert("in exp_from_loc :" + exp_from_loc);
      }
 
      var exp_to_loc = document.getElementById('toLocation');
@@ -4061,7 +4070,7 @@
          file = "";
      }
 
-     if (validateExpenseDetails(exp_date, exp_from_loc, exp_to_loc, exp_narration, exp_unit, exp_amt, acc_head_id, exp_name_id, currency_id, file)) {
+    // if (validateExpenseDetails(exp_date, exp_from_loc, exp_to_loc, exp_narration, exp_unit, exp_amt, acc_head_id, exp_name_id, currency_id, file)) {
 
          if (mydb) {
              mydb.transaction(function(t) {
@@ -4086,7 +4095,7 @@
          }
          viewBusinessExp();
 
-     }
+    // }
  }
 
  function getPrimaryExpenseId(expMstId) {
@@ -4558,3 +4567,14 @@ function setTRdetailsForSettelment(travelDetailArray) {
 }
  // *********************************  Travel Settelment Send For Appoval -- End ******************************************//
 
+
+
+function getDefaultApprovePage(){
+      var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+      var pageRefSuccess = defaultPagePath + 'success.html';
+      successMessage = "Voucher Approved Successfully";
+
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRefSuccess);
+
+}

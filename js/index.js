@@ -3,9 +3,9 @@ var defaultPagePath = 'app/pages/';
 var headerMsg = "Expenzing";
 //var urlPath = 'http://1.255.255.36:13130/TnEV1_0AWeb/WebService/Login/'
 //var WebServicePath ='http://1.255.255.99:8681/NexstepWebService/mobileLinkResolver.service';
-//var WebServicePath = 'http://live.nexstepapps.com:8284/NexstepWebService/mobileLinkResolver.service';
+var WebServicePath = 'http://live.nexstepapps.com:8284/NexstepWebService/mobileLinkResolver.service';
 //var WebServicePath ='http://1.255.255.95:8080/NexstepWebService/mobileLinkResolver.service';
-var WebServicePath = 'http://1.255.255.98:8083/NexstepWebService/mobileLinkResolver.service';
+//var WebServicePath = 'http://1.255.255.98:8083/NexstepWebService/mobileLinkResolver.service';
 var clickedFlagCar = false;
 var clickedFlagTicket = false;
 var clickedFlagHotel = false;
@@ -36,6 +36,9 @@ var expensePageFlag = ''; //S for smsExpenses And N for normal expenses
 var filtersStr = "";
 var fromLocationWayPoint = "";
 var toLocationWayPoint = "";
+let profileImg = "";
+var enableDiv = "";  // Temporary for demo purpose
+
 j(document).ready(function() {
     document.addEventListener("deviceready", loaded, false);
 });
@@ -3245,6 +3248,30 @@ function createTravelMain() {
     appPageHistory.push(pageRef);
 }
 
+function viewVouchers() {
+    resetImageData();
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    var pageRef = defaultPagePath + 'viewApproverVouchers.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+function viewPastVouchers() {
+    resetImageData();
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    var pageRef = defaultPagePath + 'viewApproverPastVouchers.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+
+
 function onloadDefaultValue() {
     clickedFlagCar = false;
     clickedFlagTicket = false;
@@ -3621,3 +3648,21 @@ function editBusiExpMain(expPrimaryId) {
 }
 
 //   ****************************************  Business Edit Page -- End  ******************************** //
+
+// ****************************************** Approval Pages -- Start  *********************************** //
+
+
+function voucherDetails(loadDiv) {
+    enableDiv = loadDiv;
+    resetImageData();
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    var pageRef = defaultPagePath + 'voucherDetails.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+
+    appPageHistory.push(pageRef);
+}
+
+// ****************************************** Approval Pages -- Start  *********************************** //
