@@ -1271,7 +1271,6 @@ li.com a:hover {
     height: 75px;
     font-weight: 400;
     background-image: url(../images/ar-n.png) no-repeat right;
-    border-bottom: 1px solid #ccc;
 }
 
 .ac-container #smartClaimsID label:last-child {
@@ -3680,7 +3679,6 @@ a.hvr-hollow:active {
     }
     .fa1 {
         font-size: 80px;
-        margin-left: 150px;
         margin-top: 20px;
         margin-bottom: 20px;
         color: lightgray;
