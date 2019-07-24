@@ -1040,7 +1040,8 @@ div.image {
 .expbusinessbtn {
     width: 50%;
     font-size: 13px;
-    background-color: #598e3e;
+    background-color: #337ab7;
+    border-color: #2e6da4;
     border-radius: 0;
     float: left;
     padding: 10px 0;
@@ -1050,7 +1051,8 @@ div.image {
 .expbusinessbtnsync {
     width: 50%;
     font-size: 13px;
-    background-color: #1a72e8;
+    background-color: #337ab7;
+    border-color: #2e6da4;
     border-radius: 0;
     padding: 10px 0;
     border: 1px solid #ccc;
@@ -1059,7 +1061,8 @@ div.image {
 .expbusinessbtnsingle {
     width: 100%;
     font-size: 13px;
-    background-color: #1a72e8;
+    background-color: #337ab7;
+    border-color: #2e6da4;
     border-radius: 0;
     padding: 10px 0;
 }
@@ -1107,41 +1110,30 @@ div.image {
 .threebtn1 {
     width: 27%;
     font-size: 12px;
-    background-color: #1a72e8;
     border-radius: 0;
-    border: 1px solid #ccc;
     float: left;
     padding: 10px 5px;
-    background-color: #f4f4f4;
-    color: black;
-    /* font-size: 14px; */
+    background-color: #337ab7;
+    border-color: #f4f4f4;;
 }
 
 .threebtn2 {
     width: 40%;
     font-size: 12px;
-    /* background-color: #598e3e; */
     border-radius: 0;
     border: 1px solid #ccc;
     float: left;
-    padding: 10px 5px;
-    background-color: #f4f4f4;
-    color: black;
+    background-color: #337ab7;
+    border-color: #f4f4f4;;
 }
 
 .threebtn3 {
     width: 30%;
     font-size: 12px;
-    /* background-color: #e88b00; */
-    /* border-radius: 0; */
-    /* border: 0; */
-    /* padding: 10px 0; */
     border-radius: 0;
-    border: 1px solid #ccc;
     float: left;
-    padding: 10px 5px;
-    background-color: #f4f4f4;
-    color: black;
+    background-color: #337ab7;
+    border-color: #f4f4f4;;
 }
 
 .dropdown-menu {
