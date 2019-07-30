@@ -4035,7 +4035,7 @@
         if(jsonFindBEEditValues.imageAttach != "" && jsonFindBEEditValues.imageAttach != null)
         {
                smallImageBE.style.display = 'block';
-               fileTempGalleryBE =  jsonFindBEEditValues.imageAttach;
+               fileTempCameraBE =  jsonFindBEEditValues.imageAttach;
                smallImageBE.src =  jsonFindBEEditValues.imageAttach;
         }
  
