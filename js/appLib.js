@@ -4035,8 +4035,8 @@
         if(jsonFindBEEditValues.imageAttach != "" && jsonFindBEEditValues.imageAttach != null)
         {
                smallImageBE.style.display = 'block';
-             //  smallImageBE.src = "data:image/jpeg;base64," + imageURI;
-               document.getElementById("smallImageBE").src = "data:image/jpeg;base64," +jsonFindBEEditValues.imageAttach;
+               fileTempGalleryBE =  jsonFindBEEditValues.imageAttach;
+               smallImageBE.src =  jsonFindBEEditValues.imageAttach;
         }
  
  }
