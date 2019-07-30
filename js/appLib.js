@@ -149,8 +149,9 @@
          t.executeSql("CREATE TABLE IF NOT EXISTS travelExpenseNameMst (id INTEGER PRIMARY KEY ASC,expenseNameId INTEGER, expenseName TEXT, isModeCategory char(1),accountCodeId INTEGER,accHeadId INTEGER REFERENCES travelAccountHeadMst(accHeadId))");
          t.executeSql("CREATE TABLE IF NOT EXISTS travelSettleExpDetails (tsExpId INTEGER PRIMARY KEY ASC,travelRequestId INTEGER, accHeadId INTEGER REFERENCES travelAccountHeadMst(accHeadId), expNameId INTEGER REFERENCES travelExpenseNameMst(expenseNameId),expDate DATE,expNarration TEXT, expUnit INTEGER, expAmt Double, currencyId INTEGER REFERENCES currencyMst(currencyId),travelModeId INTEGER REFERENCES travelModeMst(travelModeId), travelCategoryId INTEGER REFERENCES travelCategoryMst(travelCategoryId), cityTownId INTEGER REFERENCES cityTownMst(cityTownId),tsExpAttachment BLOB)");
          t.executeSql("CREATE TABLE IF NOT EXISTS travelRequestDetails (travelRequestId INTEGER PRIMARY KEY ASC, travelRequestNo TEXT,title TEXT, accountHeadId INTEGER,travelStartDate DATE,travelEndDate DATE,travelDomOrInter CHAR(1), advanceRequested TEXT,advanceAmount INTEGER)");
-/*         t.executeSql("CREATE TABLE IF NOT EXISTS travelRequestDetails (travelRequestId INTEGER PRIMARY KEY ASC, travelRequestNo TEXT,title TEXT, accountHeadId INTEGER,travelStartDate DATE,travelEndDate DATE,travelDomOrInter CHAR(1))");
-*/       t.executeSql("CREATE TABLE IF NOT EXISTS accountHeadEAMst (accountHeadId INTEGER PRIMARY KEY ASC, accHeadName TEXT)");
+         /*         t.executeSql("CREATE TABLE IF NOT EXISTS travelRequestDetails (travelRequestId INTEGER PRIMARY KEY ASC, travelRequestNo TEXT,title TEXT, accountHeadId INTEGER,travelStartDate DATE,travelEndDate DATE,travelDomOrInter CHAR(1))");
+          */
+         t.executeSql("CREATE TABLE IF NOT EXISTS accountHeadEAMst (accountHeadId INTEGER PRIMARY KEY ASC, accHeadName TEXT)");
          t.executeSql("CREATE TABLE IF NOT EXISTS advanceType (advancetypeID INTEGER PRIMARY KEY ASC, advancetype TEXT)");
          t.executeSql("CREATE TABLE IF NOT EXISTS employeeAdvanceDetails (empAdvID INTEGER PRIMARY KEY ASC, emplAdvVoucherNo TEXT,empAdvTitle TEXT,Amount Double)");
          t.executeSql("CREATE TABLE IF NOT EXISTS currencyConversionMst (currencyCovId INTEGER PRIMARY KEY ASC, currencyId INTEGER REFERENCES currencyMst(currencyId), defaultcurrencyId INTEGER ,conversionRate Double)");
@@ -158,6 +159,7 @@
          t.executeSql("CREATE TABLE IF NOT EXISTS smsScrutinizerMst (ID INTEGER PRIMARY KEY ASC, filterText TEXT, filterFlag TEXT, status TEXT)");
          t.executeSql("CREATE TABLE IF NOT EXISTS delayMst (ID INTEGER PRIMARY KEY ASC, processId INTEGER, noOfDays INTEGER, restrictionStatus CHAR(1), status CHAR(1), moduleId INTEGER)");
          t.executeSql("CREATE TABLE IF NOT EXISTS perDiemTravelMst (ID INTEGER PRIMARY KEY ASC, companyId INTEGER, gradeId INTEGER, amount INTEGER, domCityTownId INTEGER, expenseHeadId INTEGER, currencyId INTEGER)");
+         t.executeSql("CREATE TABLE IF NOT EXISTS profileMst (profileId INTEGER PRIMARY KEY ASC AUTOINCREMENT,empId INTEGER, profileAttachment  BLOB)");
 
      });
  } else {
@@ -229,7 +231,6 @@
                  t.executeSql("INSERT INTO businessExpDetails (expDate, accHeadId,expNameId,expFromLoc, expToLoc, expNarration, expUnit,expAmt,currencyId,isEntitlementExceeded,busExpAttachment,wayPointunitValue) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [exp_date, acc_head_id, exp_name_id, exp_from_loc, exp_to_loc, exp_narration, exp_unit, exp_amt, currency_id, entitlement_exceeded, file, way_points]);
 
                  if (status == "0") {
-                     alert("wer status : "+status)
 
                      document.getElementById('expDate').value = "";
                      document.getElementById('expFromLoc').value = "";
@@ -729,6 +730,7 @@
                      mydb.transaction(function(t) {
                          t.executeSql("DELETE FROM accountHeadMst");
                          var accountHeadArray = data.AccountHeadArray;
+
                          if (accountHeadArray != null && accountHeadArray.length > 0) {
                              for (var i = 0; i < accountHeadArray.length; i++) {
                                  var stateArr = new Array();
@@ -1104,7 +1106,7 @@
                      });
                      // *********************************   Delay - Master - End   *******************************************************//
 
-                    // *********************************   Travel PerDiem - Master - Start   *******************************************************//
+                     // *********************************   Travel PerDiem - Master - Start   *******************************************************//
                      mydb.transaction(function(t) {
                          t.executeSql("DELETE FROM perDiemTravelMst");
                          var perDiemDomesticJSONArray = data.PerDiemDomesticJSONArray;
@@ -1315,14 +1317,6 @@
      window.localStorage.setItem("UnitId", val.UnitId);
      window.localStorage.setItem("MapProvider", val.MapProvider);
 
-//***************************** Profile Image -- Start *******************************************************//
-
-
-/*    profileImg = val.ProfileImageData;
-    console.log("profileImgprofileImg : "+profileImg);*/
-
-//***************************** Profile Image -- End*******************************************************//
-
      //For Mobile Google Map Role Start
      //End
      if (!val.hasOwnProperty('MobileMapRole')) {
@@ -1361,6 +1355,31 @@
      window.localStorage.setItem("Password", userJSON["pass"]);
      window.localStorage.setItem("localLanguage", 0);
 
+     //***************************** Profile Image -- Start *******************************************************//
+
+     try {
+         var empId = window.localStorage.getItem("EmployeeId");
+
+         if (mydb) {
+
+                      mydb.transaction(function(t) {
+                         t.executeSql("DELETE FROM profileMst");
+                     });
+
+             if (val.ProfileImageData != "" && val.ProfileImageData != null) {
+                 mydb.transaction(function(t) {
+                     t.executeSql("INSERT INTO profileMst (empId,profileAttachment) VALUES (?,?)", [empId, val.ProfileImageData]);
+                 });
+             }
+         } else {
+             alert(window.lang.translate('Database not found, your browser does not support web sql!'));
+         }
+     } catch (e) {
+         console.log(e);
+     }
+
+     //***************************** Profile Image -- End *******************************************************//
+
  }
 
  function setUserStatusInLocalStorage(status) {
@@ -1374,19 +1393,28 @@
  function dropAllTableDetails() {
 
      mydb.transaction(function(t) {
-         t.executeSql("DELETE TABLE currencyMst ");
-         t.executeSql("DELETE TABLE accountHeadMst ");
-         t.executeSql("DELETE TABLE expNameMst");
-         t.executeSql("DELETE TABLE businessExpDetails");
-         t.executeSql("DELETE TABLE walletMst");
-         t.executeSql("DELETE TABLE travelModeMst");
-         t.executeSql("DELETE TABLE travelCategoryMst ");
-         t.executeSql("DELETE TABLE cityTownMst");
-         t.executeSql("DELETE TABLE travelTypeMst");
-         t.executeSql("DELETE TABLE travelAccountHeadMst");
-         t.executeSql("DELETE TABLE travelExpenseNameMst");
-         t.executeSql("DELETE TABLE travelSettleExpDetails");
-         t.executeSql("DELETE TABLE travelRequestDetails");
+
+         t.executeSql("delete from currencyMst");
+         t.executeSql("delete from accountHeadMst");
+         t.executeSql("delete from expNameMst");
+         t.executeSql("delete from businessExpDetails");
+         t.executeSql("delete from walletMst");
+         t.executeSql("delete from travelModeMst");
+         t.executeSql("delete from travelCategoryMst");
+         t.executeSql("delete from cityTownMst");
+         t.executeSql("delete from travelTypeMst");
+         t.executeSql("delete from travelAccountHeadMst");
+         t.executeSql("delete from travelExpenseNameMst");
+         t.executeSql("delete from travelSettleExpDetails");
+         t.executeSql("delete from travelRequestDetails");
+         t.executeSql("delete from accountHeadEAMst");
+         t.executeSql("delete from advanceType");
+         t.executeSql("delete from employeeAdvanceDetails");
+         t.executeSql("delete from currencyConversionMst");
+         t.executeSql("delete from smsMaster");
+         t.executeSql("delete from smsScrutinizerMst");
+         t.executeSql("delete from profileMst");
+         
 
      });
 
@@ -3327,10 +3355,10 @@
          }
 
      } else {
-            if(document.getElementById('tabNoUpcomingDate') != null){
-                 document.getElementById('tabNoUpcomingDate').style.display = '';
-            }
-        }
+         if (document.getElementById('tabNoUpcomingDate') != null) {
+             document.getElementById('tabNoUpcomingDate').style.display = '';
+         }
+     }
 
  }
 
@@ -3750,6 +3778,7 @@
                  t.executeSql("delete from currencyConversionMst");
                  t.executeSql("delete from smsMaster");
                  t.executeSql("delete from smsScrutinizerMst");
+                 t.executeSql("delete from profileMst");
              });
          }
 
@@ -3801,12 +3830,14 @@
  // *********************************  Business Expense Edit  -- Start ******************************************//
 
  function onloadExpenseElement() {
+    var jsonFindBEEditValues = JSON.parse(window.localStorage.getItem("jsonFindBE"));
+    var accHeadId = jsonFindBEEditValues.accountHeadId;
 
      if (mydb) {
          mydb.transaction(function(t) {
              t.executeSql("SELECT * FROM accountHeadMst", [], getAccHeadListForBEEdit);
              t.executeSql("SELECT * FROM currencyMst", [], getCurrencyListForBEEdit);
-             t.executeSql("SELECT * FROM expNameMst", [], getExpNameListForBEEdit);
+             t.executeSql("SELECT * FROM expNameMst  where accHeadId=" +accHeadId, [], getExpNameListForBEEdit);
          });
      } else {
          alert('Database not found, your browser does not support web sql!');
@@ -3926,10 +3957,12 @@
          jsonFindExpNameHead["ExpenseName"] = row.expName;
          jsonExpNameArr.push(jsonFindExpNameHead);
      }
-     console.log("expenseName 15" + JSON.stringify(jsonExpNameArr));
      createExpNameDropDownForBEEdit(jsonExpNameArr);
 
+
      setEditBEJSON();
+
+
  }
 
  function createExpNameDropDownForBEEdit(jsonExpNameArr) {
@@ -3976,14 +4009,14 @@
 
      j("#accountHead").select2("val", jsonFindBEEditValues.accountHeadId);
 
-     if (jsonFindBEEditValues.units == 'undefined') {
+     if (jsonFindBEEditValues.units != null) {
          document.getElementById("expUnit").value = jsonFindBEEditValues.units;
      }
 
-     if (document.getElementById("expUnit").value == 'undefined') {
+ /*    if (document.getElementById("expUnit").value == 'undefined') {
          document.getElementById("expUnit").value = "";
          document.getElementById("expUnit").style.display = "none";
-     }
+     }*/
 
      document.getElementById("expAmt").value = jsonFindBEEditValues.amount;
 
@@ -3995,6 +4028,29 @@
 
      document.getElementById("expToLoc").value = jsonFindBEEditValues.toLocation;
 
+     getPerUnitFromDBForEdit(jsonFindBEEditValues.expenseId);
+
+     alert("images data set : "+jsonFindBEEditValues.imageAttach);
+
+        if(jsonFindBEEditValues.imageAttach != "" && jsonFindBEEditValues.imageAttach != null)
+        {
+               smallImageBE.style.display = 'block';
+             //  smallImageBE.src = "data:image/jpeg;base64," + imageURI;
+               document.getElementById("smallImageBE").src = "data:image/jpeg;base64," +jsonFindBEEditValues.imageAttach;
+        }
+ 
+ }
+
+  function getPerUnitFromDBForEdit(expenseNameID) {
+     j('#errorMsgArea').children('span').text("");
+     if (mydb) {
+         //Get all the employeeDetails from the database with a select statement, set outputEmployeeDetails as the callback function for the executeSql command
+         mydb.transaction(function(t) {
+             t.executeSql("SELECT * FROM expNameMst where id=" + expenseNameID, [], setPerUnitDetailsForEdit);
+         });
+     } else {
+         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
+     }
  }
 
  function updateBusinessDetails(busExpDetailId) {
@@ -4035,18 +4091,9 @@
 
      var exp_date = document.getElementById('expDate').value;
 
-     var exp_from_loc = document.getElementById('fromLocation');
+     var exp_from_loc = document.getElementById('expFromLoc').value;
 
-     if (exp_from_loc == null) {
-         exp_from_loc = "";
-         //alert("in exp_from_loc :" + exp_from_loc);
-     }
-
-     var exp_to_loc = document.getElementById('toLocation');
-
-     if (exp_to_loc == null) {
-         exp_to_loc = "";
-     }
+     var exp_to_loc = document.getElementById('expToLoc').value;
 
      var exp_narration = document.getElementById('expNarration').value;
 
@@ -4070,32 +4117,32 @@
          file = "";
      }
 
-    // if (validateExpenseDetails(exp_date, exp_from_loc, exp_to_loc, exp_narration, exp_unit, exp_amt, acc_head_id, exp_name_id, currency_id, file)) {
+      if (validateExpenseDetails(exp_date, exp_from_loc, exp_to_loc, exp_narration, exp_unit, exp_amt, acc_head_id, exp_name_id, currency_id, file)) {
 
-         if (mydb) {
-             mydb.transaction(function(t) {
-                 console.log("accHeadId =" + acc_head_id)
-                 console.log("expNameId =" + exp_name_id)
-                 console.log("expDate =" + expDate)
-                 console.log("fromLocation =" + exp_from_loc)
-                 console.log("toLocation =" + exp_to_loc)
-                 console.log("expNarration =" + exp_narration)
-                 console.log("expUnit =" + exp_unit)
-                 console.log("expAmt =" + exp_amt)
-                 console.log("currencyId =" + currency_id)
-                 console.log("busExpDetailId =" + busExpDetailId)
+     if (mydb) {
+         mydb.transaction(function(t) {
+             console.log("accHeadId =" + acc_head_id)
+             console.log("expNameId =" + exp_name_id)
+             console.log("expDate =" + expDate)
+             console.log("fromLocation =" + exp_from_loc)
+             console.log("toLocation =" + exp_to_loc)
+             console.log("expNarration =" + exp_narration)
+             console.log("expUnit =" + exp_unit)
+             console.log("expAmt =" + exp_amt)
+             console.log("currencyId =" + currency_id)
+             console.log("busExpDetailId =" + busExpDetailId)
 
-                 t.executeSql("UPDATE businessExpDetails set accHeadId ='" + acc_head_id + "', expNameId ='" + exp_name_id + "',expDate = '" + exp_date + "'   ,expFromLoc = '" + exp_from_loc + "'   ,expToLoc = '" + exp_to_loc + "'    ,expUnit = '" + exp_unit + "'   , expAmt = '" + exp_amt + "'   ,    expNarration = '" + exp_narration + "' ,currencyId = '" + currency_id + "' where busExpId = " + busExpDetailId + ";");
-             });
+             t.executeSql("UPDATE businessExpDetails set accHeadId ='" + acc_head_id + "', expNameId ='" + exp_name_id + "',expDate = '" + exp_date + "'   ,expFromLoc = '" + exp_from_loc + "'   ,expToLoc = '" + exp_to_loc + "'    ,expUnit = '" + exp_unit + "'   , expAmt = '" + exp_amt + "'   ,    expNarration = '" + exp_narration + "' ,currencyId = '" + currency_id + "' where busExpId = " + busExpDetailId + ";");
+         });
 
-             alert("Record update successfully");
+         alert("Record update successfully");
 
-         } else {
-             alert("db not found, your browser does not support web sql!");
-         }
-         viewBusinessExp();
+     } else {
+         alert("db not found, your browser does not support web sql!");
+     }
+     viewBusinessExp();
 
-    // }
+      }
  }
 
  function getPrimaryExpenseId(expMstId) {
@@ -4170,13 +4217,13 @@
 
                          if (daysDiff <= noOfDays && daysDiff > -7) {
 
-                            j('#validationMsgBox').show();
-                            j('#validationMsgBoxRoundTrip').show();
-                            
+                             j('#validationMsgBox').show();
+                             j('#validationMsgBoxRoundTrip').show();
+
                              expMsg = "This is last minute trip request! You have crossed the time limit of " + noOfDays + " days for trip request.";
-                             
+
                              document.getElementById("delayDaysMsgRoundArea").style.display = "";
-                             document.getElementById("delayDaysMsgArea").style.display = "";  
+                             document.getElementById("delayDaysMsgArea").style.display = "";
 
                              j('#delayDaysMsgArea').children('span').text(expMsg);
                              j('#delayDaysMsgRoundArea').children('span').text(expMsg);
@@ -4184,14 +4231,14 @@
                              document.getElementById("selectDate_One").style.borderColor = "#960e0e";
                              document.getElementById("selectDate_Three").style.borderColor = "#960e0e";
 
-                         }else{
+                         } else {
                              document.getElementById("selectDate_One").style.borderColor = "#cccccc";
                              document.getElementById("selectDate_Three").style.borderColor = "#cccccc";
                              j('#delayDaysMsgArea').children('span').text(expMsg);
                              j('#delayDaysMsgRoundArea').children('span').text(expMsg);
                              disableTableRow();
                          }
-                         
+
                      }
                  });
          });
@@ -4229,14 +4276,14 @@
  }
 
  function dateOverLapMsg(jsonToSaveTR) {
-    j('#overlapMsgRoundTripArea').children('span').text("");
-    j('#overlapMsgArea').children('span').text("");
-    
-    var spanValueErrorMsg1 = document.getElementById('errorMsg1').innerHTML;
-    var spanValueErrorMsg2 = document.getElementById('errorMsg2').innerHTML;
+     j('#overlapMsgRoundTripArea').children('span').text("");
+     j('#overlapMsgArea').children('span').text("");
 
-    var spanValueErrorMsg3 = document.getElementById('errorMsg3').innerHTML;
-    var spanValueErrorMsg4 = document.getElementById('errorMsg4').innerHTML;
+     var spanValueErrorMsg1 = document.getElementById('errorMsg1').innerHTML;
+     var spanValueErrorMsg2 = document.getElementById('errorMsg2').innerHTML;
+
+     var spanValueErrorMsg3 = document.getElementById('errorMsg3').innerHTML;
+     var spanValueErrorMsg4 = document.getElementById('errorMsg4').innerHTML;
 
      j.ajax({
          url: window.localStorage.getItem("urlPath") + "ValidateTravelVoucherForDateRange",
@@ -4246,7 +4293,7 @@
          data: JSON.stringify(jsonToSaveTR),
          success: function(data) {
              if (data.Status == "Y") {
-                var overlapMsg = data.Message;
+                 var overlapMsg = data.Message;
                  if (overlapMsg != "") {
                      j('#validationMsgBox').show();
                      j('#validationMsgBoxRoundTrip').show();
@@ -4261,24 +4308,24 @@
                  }
              } else {
 
-                if(spanValueErrorMsg1 == "" && spanValueErrorMsg2 == "" ){
-                         document.getElementById("selectDate_One").style.borderColor = "#cccccc";   
-                }
-                
-                if(spanValueErrorMsg3 == ""){
+                 if (spanValueErrorMsg1 == "" && spanValueErrorMsg2 == "") {
+                     document.getElementById("selectDate_One").style.borderColor = "#cccccc";
+                 }
+
+                 if (spanValueErrorMsg3 == "") {
                      document.getElementById("selectDate_Three").style.borderColor = "#cccccc";
-                }
+                 }
 
-                if(spanValueErrorMsg4 == ""){
-                    document.getElementById("selectDate_Two").style.borderColor = "#cccccc";
+                 if (spanValueErrorMsg4 == "") {
+                     document.getElementById("selectDate_Two").style.borderColor = "#cccccc";
 
-                }
-                j('#overlapMsgArea').children('span').text("");
-                j('#overlapMsgRoundTripArea').children('span').text("");
+                 }
+                 j('#overlapMsgArea').children('span').text("");
+                 j('#overlapMsgRoundTripArea').children('span').text("");
 
-                requestRunning = false;
+                 requestRunning = false;
              }
-              disableTableRow();
+             disableTableRow();
          },
          error: function(data) {
              requestRunning = false;
@@ -4310,41 +4357,39 @@
      return true;
  }
 
- function disableTableRow(){
-    var spanValueErrorMsg1 = document.getElementById('errorMsg1').innerHTML;
-    var spanValueErrorMsg2 = document.getElementById('errorMsg2').innerHTML;
+ function disableTableRow() {
+     var spanValueErrorMsg1 = document.getElementById('errorMsg1').innerHTML;
+     var spanValueErrorMsg2 = document.getElementById('errorMsg2').innerHTML;
 
-    var spanValueErrorMsg3 = document.getElementById('errorMsg3').innerHTML;
-    var spanValueErrorMsg4 = document.getElementById('errorMsg4').innerHTML;
+     var spanValueErrorMsg3 = document.getElementById('errorMsg3').innerHTML;
+     var spanValueErrorMsg4 = document.getElementById('errorMsg4').innerHTML;
 
-    if(spanValueErrorMsg1 == ""){
-        document.getElementById("delayDaysMsgArea").style.display = "none";   
-    }
+     if (spanValueErrorMsg1 == "") {
+         document.getElementById("delayDaysMsgArea").style.display = "none";
+     }
 
-    if(spanValueErrorMsg3 == ""){
-        document.getElementById("delayDaysMsgRoundArea").style.display = "none";   
-    }
+     if (spanValueErrorMsg3 == "") {
+         document.getElementById("delayDaysMsgRoundArea").style.display = "none";
+     }
 
-    if(spanValueErrorMsg3 == ""  && spanValueErrorMsg4 == "" ){
-        j("#validationMsgBoxRoundTrip").hide();
-    }
+     if (spanValueErrorMsg3 == "" && spanValueErrorMsg4 == "") {
+         j("#validationMsgBoxRoundTrip").hide();
+     }
 
-    if(spanValueErrorMsg1 == "" && spanValueErrorMsg2 == ""){
-        j("#validationMsgBox").hide();
-    }
+     if (spanValueErrorMsg1 == "" && spanValueErrorMsg2 == "") {
+         j("#validationMsgBox").hide();
+     }
  }
 
  // *********************************  Travel Date For Overlap Validation -- End ******************************************//
 
-// *********************************  Travel Settelment Advance Amount -- Start ******************************************//
+ // *********************************  Travel Settelment Advance Amount -- Start ******************************************//
 
+ function getAdvanceAmountOnChange() {
 
-function getAdvanceAmountOnChange() {
-
-    var travelRequestId = j("#travelRequestName").select2('data').id;
-    getAdvanceAmountfromDBTravel(travelRequestId);
-}
-
+     var travelRequestId = j("#travelRequestName").select2('data').id;
+     getAdvanceAmountfromDBTravel(travelRequestId);
+ }
 
  function getAdvanceAmountfromDBTravel(travelRequestId) {
      if (mydb) {
@@ -4356,225 +4401,261 @@ function getAdvanceAmountOnChange() {
      }
  }
 
-
  function fetchTravelAdvanceDetails(transaction, results) {
      var i;
      var jsonExpenseNameArr = [];
      for (i = 0; i < results.rows.length; i++) {
          var row = results.rows.item(i);
          var jsonFindTravelType = new Object();
-         var advReq =  row.advanceRequested;
+         var advReq = row.advanceRequested;
          var advAmt = row.advanceAmount;
 
-         if(advReq == "Y"){   
-            j('#advanceTxtArea').show(); 
-            document.getElementById('advAmt').value = advAmt;
-         }else{
-            j('#advanceTxtArea').hide(); 
+         if (advReq == "Y") {
+             j('#advanceTxtArea').show();
+             document.getElementById('advAmt').value = advAmt;
+         } else {
+             j('#advanceTxtArea').hide();
          }
      }
  }
 
-// *********************************  Travel Settelment Advance Amount -- End ******************************************//
+ // *********************************  Travel Settelment Advance Amount -- End ******************************************//
 
-// *********************************  Travel Settelment Entitlement -- Start ******************************************//
-function checkEntitlementForTravelSettelment() {
-    var travelExpenseReqID;
-    var travelModeID;
-    var travelCategoryID;
-    var cityTownID;
-    var cityTownName;
-    var travelReqID;
-    var travelExpenseReqName;
+ // *********************************  Travel Settelment Entitlement -- Start ******************************************//
+ function checkEntitlementForTravelSettelment() {
+     var travelExpenseReqID;
+     var travelModeID;
+     var travelCategoryID;
+     var cityTownID;
+     var cityTownName;
+     var travelReqID;
+     var travelExpenseReqName;
 
-    if (j("#travelRequestName").select2('data') != null) {
-        travelReqID = j("#travelRequestName").select2('data').id;
-    }
-    if (j("#travelModeForTS").select2('data') != null) {
-        travelModeID = j("#travelModeForTS").select2('data').id;
-    }
-    if (j("#travelCategoryForTS").select2('data') != null) {
-        travelCategoryID = j("#travelCategoryForTS").select2('data').id;
-    }
-    if (j("#Citytown").select2('data') != null) {
-        cityTownID = j("#Citytown").select2('data').id;
-        cityTownName = j("#Citytown").select2('data').name;
-    }
-    if (j("#travelExpenseName").select2('data') != null) {
-        travelExpenseReqID = j("#travelExpenseName").select2('data').id;
-        travelExpenseReqName = j("#travelExpenseName").select2('data').name;
-    }
+     if (j("#travelRequestName").select2('data') != null) {
+         travelReqID = j("#travelRequestName").select2('data').id;
+     }
+     if (j("#travelModeForTS").select2('data') != null) {
+         travelModeID = j("#travelModeForTS").select2('data').id;
+     }
+     if (j("#travelCategoryForTS").select2('data') != null) {
+         travelCategoryID = j("#travelCategoryForTS").select2('data').id;
+     }
+     if (j("#Citytown").select2('data') != null) {
+         cityTownID = j("#Citytown").select2('data').id;
+         cityTownName = j("#Citytown").select2('data').name;
+     }
+     if (j("#travelExpenseName").select2('data') != null) {
+         travelExpenseReqID = j("#travelExpenseName").select2('data').id;
+         travelExpenseReqName = j("#travelExpenseName").select2('data').name;
+     }
 
-    if (travelReqID != 'undefined' && travelReqID != '-1') {
-        getExpenseIdForTravelFromDB(travelReqID, travelModeID, travelCategoryID, cityTownID, travelExpenseReqID, cityTownName, travelExpenseReqName);
-    }
-}
+     if (travelReqID != 'undefined' && travelReqID != '-1') {
+         getExpenseIdForTravelFromDB(travelReqID, travelModeID, travelCategoryID, cityTownID, travelExpenseReqID, cityTownName, travelExpenseReqName);
+     }
+ }
 
-function getExpenseIdForTravelFromDB(travelReqID, travelModeID, travelCategoryID, cityTownID, travelExpenseReqID, cityTownName, travelExpenseReqName) {
+ function getExpenseIdForTravelFromDB(travelReqID, travelModeID, travelCategoryID, cityTownID, travelExpenseReqID, cityTownName, travelExpenseReqName) {
 
-    if (mydb) {
-        mydb.transaction(function(t) {
-            t.executeSql("SELECT expenseNameId FROM travelExpenseNameMst where id=" + travelExpenseReqID, [],
-                function(transaction, results) {
+     if (mydb) {
+         mydb.transaction(function(t) {
+             t.executeSql("SELECT expenseNameId FROM travelExpenseNameMst where id=" + travelExpenseReqID, [],
+                 function(transaction, results) {
 
-                    for (i = 0; i < results.rows.length; i++) {
+                     for (i = 0; i < results.rows.length; i++) {
 
-                        var row = results.rows.item(i);
-                        var expenseNameId = row.expenseNameId;
+                         var row = results.rows.item(i);
+                         var expenseNameId = row.expenseNameId;
 
-                        if (expenseNameId != "" && expenseNameId != 0) {
-                            calcuteEntitlementForTS(expenseNameId, travelReqID, travelExpenseReqID, travelModeID, travelCategoryID, cityTownID, cityTownName, travelExpenseReqName);
-                        }
+                         if (expenseNameId != "" && expenseNameId != 0) {
+                             calcuteEntitlementForTS(expenseNameId, travelReqID, travelExpenseReqID, travelModeID, travelCategoryID, cityTownID, cityTownName, travelExpenseReqName);
+                         }
 
-                    }
-                });
-        });
-    } else {
-        alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-    }
+                     }
+                 });
+         });
+     } else {
+         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
+     }
 
-}
+ }
 
-function calcuteEntitlementForTS(expenseNameId, travelReqID, travelExpenseReqID, travelModeID, travelCategoryID, cityTownID, cityTownName, travelExpenseReqName) {
+ function calcuteEntitlementForTS(expenseNameId, travelReqID, travelExpenseReqID, travelModeID, travelCategoryID, cityTownID, cityTownName, travelExpenseReqName) {
 
-    console.log("travelExpenseNameID : " + expenseNameId + "cityTownID : " + cityTownID);
+     console.log("travelExpenseNameID : " + expenseNameId + "cityTownID : " + cityTownID);
 
-    if (validateValuesForEntitlement(travelReqID, travelModeID, travelCategoryID, cityTownID, travelExpenseReqID)) {
-        if (mydb) {
-            mydb.transaction(function(t) {
-                t.executeSql("Select amount from perDiemTravelMst where domCityTownId = '" + cityTownID + "' and expenseHeadId ='" + expenseNameId + "'", [],
-                    function(transaction, results) {
-                        for (i = 0; i < results.rows.length; i++) {
+     if (validateValuesForEntitlement(travelReqID, travelModeID, travelCategoryID, cityTownID, travelExpenseReqID)) {
+         if (mydb) {
+             mydb.transaction(function(t) {
+                 t.executeSql("Select amount from perDiemTravelMst where domCityTownId = '" + cityTownID + "' and expenseHeadId ='" + expenseNameId + "'", [],
+                     function(transaction, results) {
+                         for (i = 0; i < results.rows.length; i++) {
 
-                            var row = results.rows.item(i);
-                            var amount = row.amount;
-                            var tsAmount = document.getElementById('expAmt').value;
-                            var exceptionMessage = "";
+                             var row = results.rows.item(i);
+                             var amount = row.amount;
+                             var tsAmount = document.getElementById('expAmt').value;
+                             var exceptionMessage = "";
 
-                            if(tsAmount > amount){
-                                exceptionMessage = "(Exceeding Per Diem Entitlement amount defined: " + amount + " for Expense Head :  " + travelExpenseReqName + " and City/Town : "+cityTownName+")";
-                                j('#travelErrorMsgArea').children('span').text(exceptionMessage);
-                            }else{
-                                j('#travelErrorMsgArea').children('span').text(exceptionMessage);
-                            }
+                             if (tsAmount > amount) {
+                                 exceptionMessage = "(Exceeding Per Diem Entitlement amount defined: " + amount + " for Expense Head :  " + travelExpenseReqName + " and City/Town : " + cityTownName + ")";
+                                 j('#travelErrorMsgArea').children('span').text(exceptionMessage);
+                             } else {
+                                 j('#travelErrorMsgArea').children('span').text(exceptionMessage);
+                             }
 
-                        }
-                    });
-            });
-        } else {
-            alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-        }
-    }
-}
+                         }
+                     });
+             });
+         } else {
+             alert(window.lang.translate('Database not found, your browser does not support web sql!'));
+         }
+     }
+ }
 
-function validateValuesForEntitlement(travelReqID, cityTownID, travelExpenseReqID) {
-    if (travelReqID != "-1" && cityTownID != "-1" && travelExpenseReqID != "-1") {
-        return true;
-    } else {
-        return false;
-    }
-}
+ function validateValuesForEntitlement(travelReqID, cityTownID, travelExpenseReqID) {
+     if (travelReqID != "-1" && cityTownID != "-1" && travelExpenseReqID != "-1") {
+         return true;
+     } else {
+         return false;
+     }
+ }
 
-function resetAmountAndEntitlementMsg(){
+ function resetAmountAndEntitlementMsg() {
      document.getElementById('expAmt').value = "";
      j('#travelErrorMsgArea').children('span').text('');
-}
+ }
 
-// *********************************  Travel Settelment Entitlement -- End ******************************************//
+ // *********************************  Travel Settelment Entitlement -- End ******************************************//
 
-// *********************************  Travel Settelment Send For Appoval -- Start ******************************************//
-function tripDetails() {
-    var travelRequestId = j("#travelRequestName").select2('data').id;
-    alert("travelRequestId : " + travelRequestId);
-    var jsonToPopulateTRDetails = new Object();
-    jsonToPopulateTRDetails["TravelRequestId"] = travelRequestId;
-    checkTRDetailsExist(travelRequestId,jsonToPopulateTRDetails);
-}
+ // *********************************  Travel Settelment Send For Appoval -- Start ******************************************//
+ function tripDetails() {
+     var travelRequestId = j("#travelRequestName").select2('data').id;
+     alert("travelRequestId : " + travelRequestId);
+     var jsonToPopulateTRDetails = new Object();
+     jsonToPopulateTRDetails["TravelRequestId"] = travelRequestId;
+     checkTRDetailsExist(travelRequestId, jsonToPopulateTRDetails);
+ }
 
-function checkTRDetailsExist(travelRequestId,jsonToPopulateTRDetails) {
-    if (mydb) {
-        mydb.transaction(function(t) {
-            t.executeSql("Select * from travelSettleExpDetails where travelRequestId = '" + travelRequestId + "'", [],
-                function(transaction, results) {
-                    alert("results.rows.length : " + results.rows.length);
-                    var noOfRows = results.rows.length;
-                    if (noOfRows == 0) {
-                          populateTravelRequestDetailsAjax(jsonToPopulateTRDetails);
-                    } else {
+ function checkTRDetailsExist(travelRequestId, jsonToPopulateTRDetails) {
+     if (mydb) {
+         mydb.transaction(function(t) {
+             t.executeSql("Select * from travelSettleExpDetails where travelRequestId = '" + travelRequestId + "'", [],
+                 function(transaction, results) {
+                     alert("results.rows.length : " + results.rows.length);
+                     var noOfRows = results.rows.length;
+                     if (noOfRows == 0) {
+                         populateTravelRequestDetailsAjax(jsonToPopulateTRDetails);
+                     } else {
                          return false;
-                    }
+                     }
 
-                });
-        });
-    } else {
-        alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-    }
+                 });
+         });
+     } else {
+         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
+     }
 
-}
+ }
 
-function populateTravelRequestDetailsAjax(jsonToPopulateTRDetails) {
-    alert("populateTravelRequestDetailsAjax :");
-    var pageRefSuccess = defaultPagePath + 'success.html';
-    var pageRefFailure = defaultPagePath + 'failure.html';
+ function populateTravelRequestDetailsAjax(jsonToPopulateTRDetails) {
+     alert("populateTravelRequestDetailsAjax :");
+     var pageRefSuccess = defaultPagePath + 'success.html';
+     var pageRefFailure = defaultPagePath + 'failure.html';
 
-    j.ajax({
-        url: window.localStorage.getItem("urlPath") + "FetchDetailLinesForTS",
-        type: 'POST',
-        dataType: 'json',
-        crossDomain: true,
-        data: JSON.stringify(jsonToPopulateTRDetails),
-        success: function(data) {
-            if (data.Status == "Success") {
-                var travelDetailArray = data.TravelDetailArray;
-                setTRdetailsForSettelment(travelDetailArray);
+     j.ajax({
+         url: window.localStorage.getItem("urlPath") + "FetchDetailLinesForTS",
+         type: 'POST',
+         dataType: 'json',
+         crossDomain: true,
+         data: JSON.stringify(jsonToPopulateTRDetails),
+         success: function(data) {
+             if (data.Status == "Success") {
+                 var travelDetailArray = data.TravelDetailArray;
+                 setTRdetailsForSettelment(travelDetailArray);
 
-                requestRunning = false;
-            } else {
-                successMessage = "Error: Oops something is wrong, Please Contact System Administer";
-                requestRunning = false;
-            }
-        },
-        error: function(data) {
-            requestRunning = false;
-        }
-    });
-}
+                 requestRunning = false;
+             } else {
+                 successMessage = "Error: Oops something is wrong, Please Contact System Administer";
+                 requestRunning = false;
+             }
+         },
+         error: function(data) {
+             requestRunning = false;
+         }
+     });
+ }
 
-function setTRdetailsForSettelment(travelDetailArray) {
+ function setTRdetailsForSettelment(travelDetailArray) {
 
-    alert("travel detail : " + JSON.stringify(travelDetailArray));
-    mydb.transaction(function(t) {
-        if (travelDetailArray != null && travelDetailArray.length > 0) {
-            for (var i = 0; i < travelDetailArray.length; i++) {
-                var detailArr = new Array();
-                detailArr = travelDetailArray[i];
-                var exp_date = detailArr.ExpDate;
-                var travelRequestId = detailArr.TravelReqId;
-                var exp_name_id = detailArr.ExpNameId;
-                var exp_narration = detailArr.Narration;
-                var exp_unit = detailArr.Unit;
-                var exp_amt = detailArr.Amount;
-                var currency_id = detailArr.ExpCurrencyId;
-                var travelMode_id = detailArr.TravelModeId;
-                var travelCategory_id = detailArr.TravelCatgId;
-                var cityTown_id = detailArr.CityTownId;
-                var file = "";
+     alert("travel detail : " + JSON.stringify(travelDetailArray));
+     mydb.transaction(function(t) {
+         if (travelDetailArray != null && travelDetailArray.length > 0) {
+             for (var i = 0; i < travelDetailArray.length; i++) {
+                 var detailArr = new Array();
+                 detailArr = travelDetailArray[i];
+                 var exp_date = detailArr.ExpDate;
+                 var travelRequestId = detailArr.TravelReqId;
+                 var exp_name_id = detailArr.ExpNameId;
+                 var exp_narration = detailArr.Narration;
+                 var exp_unit = detailArr.Unit;
+                 var exp_amt = detailArr.Amount;
+                 var currency_id = detailArr.ExpCurrencyId;
+                 var travelMode_id = detailArr.TravelModeId;
+                 var travelCategory_id = detailArr.TravelCatgId;
+                 var cityTown_id = detailArr.CityTownId;
+                 var file = "";
 
-                t.executeSql("INSERT INTO travelSettleExpDetails  (expDate, travelRequestId,expNameId,expNarration, expUnit,expAmt,currencyId,travelModeId,travelCategoryId,cityTownId,tsExpAttachment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [exp_date, travelRequestId, exp_name_id, exp_narration, exp_unit, exp_amt, currency_id, travelMode_id, travelCategory_id, cityTown_id, file]);
-            }
-        }
-    });
-}
+                 t.executeSql("INSERT INTO travelSettleExpDetails  (expDate, travelRequestId,expNameId,expNarration, expUnit,expAmt,currencyId,travelModeId,travelCategoryId,cityTownId,tsExpAttachment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [exp_date, travelRequestId, exp_name_id, exp_narration, exp_unit, exp_amt, currency_id, travelMode_id, travelCategory_id, cityTown_id, file]);
+             }
+         }
+     });
+ }
  // *********************************  Travel Settelment Send For Appoval -- End ******************************************//
 
+ function getDefaultApprovePage() {
+     var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+     var pageRefSuccess = defaultPagePath + 'success.html';
+     successMessage = "Voucher Approved Successfully";
 
+     j('#mainHeader').load(headerBackBtn);
+     j('#mainContainer').load(pageRefSuccess);
 
-function getDefaultApprovePage(){
-      var headerBackBtn = defaultPagePath + 'backbtnPage.html';
-      var pageRefSuccess = defaultPagePath + 'success.html';
-      successMessage = "Voucher Approved Successfully";
+ }
 
-        j('#mainHeader').load(headerBackBtn);
-        j('#mainContainer').load(pageRefSuccess);
+ //***************************** Profile Image -- Start *******************************************************//
+ function findProfileImagedata() {
 
-}
+     try {
+
+         var empId = window.localStorage.getItem("EmployeeId");
+
+         if (mydb) {
+             mydb.transaction(function(t) {
+                 t.executeSql("Select profileAttachment from profileMst where empId = '" + empId + "'", [],
+                     function(transaction, results) {
+                         for (i = 0; i < results.rows.length; i++) {
+
+                             var row = results.rows.item(i);
+
+                             if (row.profileAttachment != "" ) {
+                                 if (document.getElementById("ProfilePreview") != null) {
+                                     document.getElementById("ProfilePreview").src = "data:image/png;base64," + row.profileAttachment;
+                                 }
+                                 if (document.getElementById("sideNavProfilePreview") != null) {
+                                     document.getElementById("sideNavProfilePreview").src = "data:image/png;base64," + row.profileAttachment;
+                                 }
+                             }
+                         }
+
+                     });
+             });
+         } else {
+             alert(window.lang.translate('Database not found, your browser does not support web sql!'));
+         }
+
+     } catch (e) {
+         console.log(e);
+     }
+
+ }
+
+ //***************************** Profile Image -- End *******************************************************//

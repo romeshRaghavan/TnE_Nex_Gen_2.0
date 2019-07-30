@@ -3,9 +3,9 @@ var defaultPagePath = 'app/pages/';
 var headerMsg = "Expenzing";
 //var urlPath = 'http://1.255.255.36:13130/TnEV1_0AWeb/WebService/Login/'
 //var WebServicePath ='http://1.255.255.99:8681/NexstepWebService/mobileLinkResolver.service';
-var WebServicePath = 'http://live.nexstepapps.com:8284/NexstepWebService/mobileLinkResolver.service';
+//var WebServicePath = 'http://live.nexstepapps.com:8284/NexstepWebService/mobileLinkResolver.service';
 //var WebServicePath ='http://1.255.255.95:8080/NexstepWebService/mobileLinkResolver.service';
-//var WebServicePath = 'http://1.255.255.98:8083/NexstepWebService/mobileLinkResolver.service';
+var WebServicePath = 'http://1.255.255.98:8083/NexstepWebService/mobileLinkResolver.service';
 var clickedFlagCar = false;
 var clickedFlagTicket = false;
 var clickedFlagHotel = false;
@@ -36,7 +36,7 @@ var expensePageFlag = ''; //S for smsExpenses And N for normal expenses
 var filtersStr = "";
 var fromLocationWayPoint = "";
 var toLocationWayPoint = "";
-let profileImg = "";
+var profileImg = "";
 var enableDiv = "";  // Temporary for demo purpose
 
 j(document).ready(function() {
@@ -65,7 +65,6 @@ function login() {
         data: JSON.stringify(jsonToBeSend),
         success: function(data) {
             if (data.Status == 'Success') {
-
                 if (data.hasOwnProperty('multiLangInMobile') && data.multiLangInMobile != null &&
                     data.multiLangInMobile) {
                     var headerBackBtn = defaultPagePath + 'withoutBckBtn.html';
@@ -107,6 +106,7 @@ function login() {
                             startWatch();
                         }
                     }
+
                 }
 
             } else if (data.Status == 'Failure') {
@@ -1394,6 +1394,7 @@ function setPerUnitDetails(transaction, results) {
         perUnitDetailsJSON["isAttachmentReq"] = row.isAttachmentReq;
         showAttachmentmessage();
 
+alert("rate per unit : "+ document.getElementById("ratePerUnit"));
         document.getElementById("ratePerUnit").value = row.expRatePerUnit;
         document.getElementById("expAmt").value = "";
         document.getElementById("expUnit").value = "";
@@ -3622,12 +3623,13 @@ function editBusiExpMain(expPrimaryId) {
             var dataURL = j(this).find('td.busAttachment').text();
 
             //For IOS image save
-            var data = dataURL.replace(/data:image\/(png|jpg|jpeg);base64,/, '');
+            //var data = dataURL.replace(/data:image\/(png|jpg|jpeg);base64,/, '');
 
             //For Android image save
-            //var data = dataURL.replace(/data:base64,/, '');
+            var data = dataURL.replace(/data:base64,/, '');
 
             jsonFindBE["imageAttach"] = data;
+            
             localStorage.setItem("jsonFindBE", JSON.stringify(jsonFindBE));
 
             console.log(JSON.stringify(jsonFindBE));
@@ -3646,6 +3648,114 @@ function editBusiExpMain(expPrimaryId) {
     });
     appPageHistory.push(pageRef);
 }
+
+function setPerUnitDetailsForEdit(transaction, results) {
+
+    if (results != null) {
+        var row = results.rows.item(0);
+        perUnitDetailsJSON["expenseIsfromAndToReqd"] = row.expIsFromToReq;
+        perUnitDetailsJSON["isUnitReqd"] = row.expIsUnitReq;
+        perUnitDetailsJSON["expRatePerUnit"] = row.expRatePerUnit;
+        perUnitDetailsJSON["expFixedOrVariable"] = row.expFixedOrVariable;
+        perUnitDetailsJSON["expFixedLimitAmt"] = row.expFixedLimitAmt;
+        perUnitDetailsJSON["expenseName"] = row.expName;
+        perUnitDetailsJSON["expPerUnitActiveInative"] = row.expPerUnitActiveInative;
+        perUnitDetailsJSON["isErReqd"] = row.isErReqd;
+        perUnitDetailsJSON["limitAmountForER"] = row.limitAmountForER;
+        perUnitDetailsJSON["isAttachmentReq"] = row.isAttachmentReq;
+        showAttachmentmessage();
+
+        document.getElementById("ratePerUnit").value = row.expRatePerUnit;
+/*        document.getElementById("expAmt").value = "";
+        document.getElementById("expUnit").value = "";
+        document.getElementById("expFromLoc").value = "";
+        document.getElementById("expToLoc").value = "";
+        document.getElementById("expNarration").value = "";
+        document.getElementById("expUnit").value = "";
+        document.getElementById("expAmt").value = "";
+        $(".dropdown-content").hide();
+        fromLocationWayPoint = "";
+        toLocationWayPoint = "";*/
+        if (perUnitDetailsJSON.expenseIsfromAndToReqd == 'N') {
+           document.getElementById("expFromLoc").value = "";
+            document.getElementById("expToLoc").value = "";
+            document.getElementById("expFromLoc").disabled = true;
+            document.getElementById("expToLoc").disabled = true;
+            document.getElementById("expFromLoc").style.backgroundColor = '#d1d1d1';
+            document.getElementById("expToLoc").style.backgroundColor = '#d1d1d1';
+            document.getElementById("expNarration").disabled = false;
+            document.getElementById("expNarration").style.backgroundColor = '#FFFFFF';
+            document.getElementById("mapImage").style.display = "none";
+            $(".dropdown-content").hide();
+            fromLocationWayPoint = "";
+            toLocationWayPoint = "";
+        } else {
+            document.getElementById("expFromLoc").disabled = false;
+            document.getElementById("expToLoc").disabled = false;
+/*          document.getElementById("expFromLoc").value = "";
+            document.getElementById("expToLoc").value = "";
+            document.getElementById("expNarration").value = "";*/
+            document.getElementById("expFromLoc").style.backgroundColor = '#FFFFFF';
+            document.getElementById("expToLoc").style.backgroundColor = '#FFFFFF';
+            $(".dropdown-content").hide();
+            fromLocationWayPoint = "";
+            toLocationWayPoint = "";
+            if (window.localStorage.getItem("MobileMapRole") == 'true') {
+                if (window.localStorage.getItem("MapProvider") == "GOOGLEMAP") {
+                    attachGoogleSearchBox(document.getElementById("expFromLoc"));
+                    attachGoogleSearchBox(document.getElementById("expToLoc"));
+                }
+                document.getElementById("mapImage").style.display = "";
+                document.getElementById("expNarration").disabled = true;
+                document.getElementById("expNarration").style.backgroundColor = '#d1d1d1';
+            }
+        }
+        if (perUnitDetailsJSON.isUnitReqd == 'Y') {
+            document.getElementById("expAmt").value = "";
+            if (perUnitDetailsJSON.expFixedOrVariable == 'V') {
+                flagForUnitEnable = true;
+                if (perUnitDetailsJSON.expenseIsfromAndToReqd == 'Y' && window.localStorage.getItem("MobileMapRole") == 'true') {
+                    document.getElementById("expUnit").disabled = true;
+                    document.getElementById("expUnit").style.backgroundColor = '#d1d1d1';
+                } else {
+                    document.getElementById("expUnit").disabled = false;
+                    document.getElementById("expUnit").style.backgroundColor = '#FFFFFF';
+                }
+                document.getElementById("expAmt").disabled = false;
+                document.getElementById("expAmt").style.backgroundColor = '#FFFFFF';
+            } else {
+                flagForUnitEnable = true;
+                if (perUnitDetailsJSON.expenseIsfromAndToReqd == 'Y' && window.localStorage.getItem("MobileMapRole") == 'true') {
+                    document.getElementById("expUnit").disabled = true;
+                    document.getElementById("expUnit").style.backgroundColor = '#d1d1d1';
+                } else {
+                    document.getElementById("expUnit").disabled = false;
+                    document.getElementById("expUnit").style.backgroundColor = '#FFFFFF';
+                }
+                document.getElementById("expAmt").disabled = true;
+                document.getElementById("expAmt").style.backgroundColor = '#d1d1d1';
+            }
+        } else {
+            flagForUnitEnable = false;
+            document.getElementById("expUnit").disabled = true;
+            document.getElementById("expUnit").style.backgroundColor = '#d1d1d1';
+            document.getElementById("expAmt").disabled = false;
+            document.getElementById("expAmt").style.backgroundColor = '#FFFFFF';
+        }
+        if (perUnitDetailsJSON.expPerUnitActiveInative == '1') {
+            flagForUnitEnable = false;
+            document.getElementById("expUnit").disabled = true;
+            document.getElementById("expAmt").disabled = false;
+            document.getElementById("expAmt").style.backgroundColor = '#FFFFFF';
+            document.getElementById("expUnit").style.backgroundColor = '#d1d1d1';
+        }
+    } else {
+
+        alert("Please Synch your expense Names to claim expense.");
+    }
+
+}
+
 
 //   ****************************************  Business Edit Page -- End  ******************************** //
 
