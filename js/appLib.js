@@ -4132,7 +4132,7 @@
              console.log("currencyId =" + currency_id)
              console.log("busExpDetailId =" + busExpDetailId)
 
-             t.executeSql("UPDATE businessExpDetails set accHeadId ='" + acc_head_id + "', expNameId ='" + exp_name_id + "',expDate = '" + exp_date + "'   ,expFromLoc = '" + exp_from_loc + "'   ,expToLoc = '" + exp_to_loc + "'    ,expUnit = '" + exp_unit + "'   , expAmt = '" + exp_amt + "'   ,    expNarration = '" + exp_narration + "' ,currencyId = '" + currency_id + "' where busExpId = " + busExpDetailId + ";");
+             t.executeSql("UPDATE businessExpDetails set accHeadId ='" + acc_head_id + "', expNameId ='" + exp_name_id + "',expDate = '" + exp_date + "'   ,expFromLoc = '" + exp_from_loc + "'   ,expToLoc = '" + exp_to_loc + "'    ,expUnit = '" + exp_unit + "'   , expAmt = '" + exp_amt + "'   ,    expNarration = '" + exp_narration + "' ,currencyId = '" + currency_id + "' ,busExpAttachment = '" + file + "' where busExpId = " + busExpDetailId + ";");
          });
 
          alert("Record update successfully");
