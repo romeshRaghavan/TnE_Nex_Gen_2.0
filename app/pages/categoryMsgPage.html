@@ -34,7 +34,7 @@
             <i class="fa fa-times" href="javascript:void(0)" class="closebtn" onclick="closeNav()" style="font-size:x-large;float: right;color:black;"></i>
         </div>
         <a href="#" lang="en" style="border-bottom: 1px solid lightgrey;">
-            <img src="images/profilepic.jpg" height="20%" width="20%" style="border-radius: 35px;">
+            <img src = "images/profilepic.jpg" id = "sideNavProfilePreview" height="20%" width="20%" style="border-radius: 35px;">
             <span id="empName" style="font-size:20px;margin-left:10px;"></span>
         </a>
         <a href="#" style="margin-top:15px;" onclick="showProfile()" lang="en"><i class="fa fa-user-circle-o" style="margin-right: 10px;font-size: large;"></i>
@@ -72,6 +72,8 @@
 </div>
 
 <script>
+    findProfileImagedata();
+
     function openNav() {
         document.getElementById("mySidenav").style.width = "200px";
     }
@@ -82,5 +84,5 @@
         }
     }
 
-    document.getElementById("empName").innerHTML = window.localStorage.getItem("FirstName") + " " + window.localStorage.getItem("LastName")
+    document.getElementById("empName").innerHTML = window.localStorage.getItem("FirstName") + " " + window.localStorage.getItem("LastName");
 </script>

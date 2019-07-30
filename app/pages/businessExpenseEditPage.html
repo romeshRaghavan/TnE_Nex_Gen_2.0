@@ -40,9 +40,12 @@
                                         <li>
                                             <input lang="en" placeholder="Expense Name" id="expenseName" type="text" style="width: 98%">
                                         </li>
+
+                                        <div>
                                         <li>
-                                            <input lang="en" id="ratePerUnit" type="hidden">
+                                            <input lang="en" id="ratePerUnit" type="hidden" style="width: 98%">
                                         </li>
+                                        </div>
 
                                         <li>
 
@@ -121,6 +124,7 @@
                                 currentMonth = '0' + currentMonth
                             }
 
+
                             j("#accountHead").change(function() {
                                 getExpenseNamesBasedOnAccountHead();
                             });
@@ -180,6 +184,11 @@
             </div>
         </div>
         <script type="text/javascript">
+             j(document).ready(function() {
+                     setEditBEJSON();
+             });
+
+
             $(document).ready(function() {
                 $('#horizontalTab').easyResponsiveTabs({
                     type: 'default', //Types: default, vertical, accordion           
