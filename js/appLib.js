@@ -4112,17 +4112,20 @@
 
      if (fileTempGalleryBE == undefined || fileTempGalleryBE == "") {
             file = fileTempGalleryBE;
-     } else {
+     } else if(fileTempGalleryBE != ""){
+        alert("in else gal ");
          file = fileTempGalleryBE;
      }
 
      if (fileTempCameraBE == undefined || fileTempCameraBE == "") {
             file = fileTempCameraBE;
-     } else {
+     } else if(fileTempCameraBE != ""){
+        alert("in else cam ");
          file = fileTempCameraBE;
      }
 
      if (file == undefined) {
+        alert("in fle undefned");
          file = "";
      }
 
