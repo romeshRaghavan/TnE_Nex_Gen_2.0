@@ -2069,6 +2069,8 @@ function loaded() {
 
 function onPhotoDataSuccess(imageData) {
     resetImageData();
+    alert("reset cam :"+fileTempCameraBE);
+     alert("reset gal :"+fileTempGalleryBE);
     if (voucherType == 'wallet') {
         smallImageWallet.style.display = 'block';
         //document.getElementById('imageWallet').files[0] = "data:image/jpeg;base64," + imageData;
