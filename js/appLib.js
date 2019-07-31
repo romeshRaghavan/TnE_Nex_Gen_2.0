@@ -218,7 +218,6 @@
          } else {
              file = fileTempCameraBE;
          }
-         alert("save file data :"+file);
 
          if (validateExpenseDetails(exp_date, exp_from_loc, exp_to_loc, exp_narration, exp_unit, exp_amt, acc_head_id, exp_name_id, currency_id, file)) {
 
@@ -4031,8 +4030,6 @@
 
      getPerUnitFromDBForEdit(jsonFindBEEditValues.expenseId);
 
-     alert("images data set : "+jsonFindBEEditValues.imageAttach);
-
         if(jsonFindBEEditValues.imageAttach != "" && jsonFindBEEditValues.imageAttach != null)
         {
                smallImageBE.style.display = 'block';
@@ -4110,7 +4107,7 @@
      alert("fileTempGalleryBE : "+fileTempGalleryBE);
      alert("fileTempCameraBE : "+fileTempCameraBE);
 
-     if (fileTempGalleryBE == undefined || fileTempGalleryBE == "") {
+/*     if (fileTempGalleryBE == undefined || fileTempGalleryBE == "") {
             file = fileTempGalleryBE;
      } else if(fileTempGalleryBE != ""){
         alert("in else gal ");
@@ -4122,6 +4119,11 @@
      } else if(fileTempCameraBE != ""){
         alert("in else cam ");
          file = fileTempCameraBE;
+     }*/
+
+     if(fileTempCameraBE != ""){
+        alert("in else cam ");
+        file = fileTempCameraBE;
      }
 
      if (file == undefined) {
