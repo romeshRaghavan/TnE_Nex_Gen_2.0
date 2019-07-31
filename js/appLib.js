@@ -218,6 +218,7 @@
          } else {
              file = fileTempCameraBE;
          }
+         alert("save file data :"+file);
 
          if (validateExpenseDetails(exp_date, exp_from_loc, exp_to_loc, exp_narration, exp_unit, exp_amt, acc_head_id, exp_name_id, currency_id, file)) {
 
@@ -4035,8 +4036,13 @@
         if(jsonFindBEEditValues.imageAttach != "" && jsonFindBEEditValues.imageAttach != null)
         {
                smallImageBE.style.display = 'block';
-               fileTempCameraBE =  jsonFindBEEditValues.imageAttach;
                smallImageBE.src =  jsonFindBEEditValues.imageAttach;
+
+               if(fileTempCameraBE != "" && fileTempCameraBE != null){
+                    fileTempCameraBE =  jsonFindBEEditValues.imageAttach;
+               }else{
+                    fileTempGalleryBE =  jsonFindBEEditValues.imageAttach;
+               }
         }
  
  }
@@ -4101,14 +4107,14 @@
 
      var exp_amt = document.getElementById('expAmt').value;
 
-     if (fileTempGalleryBE == undefined || fileTempGalleryBE == "") {
-
+     if (fileTempGalleryBE != undefined || fileTempGalleryBE != "") {
+             file = fileTempGalleryBE
      } else {
          file = fileTempGalleryBE;
      }
 
-     if (fileTempCameraBE == undefined || fileTempCameraBE == "") {
-
+     if (fileTempCameraBE != undefined || fileTempCameraBE != "") {
+             file = fileTempCameraBE;
      } else {
          file = fileTempCameraBE;
      }
@@ -4136,6 +4142,7 @@
          });
 
          alert("Record update successfully");
+         resetImageData();
 
      } else {
          alert("db not found, your browser does not support web sql!");
