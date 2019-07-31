@@ -4107,14 +4107,17 @@
 
      var exp_amt = document.getElementById('expAmt').value;
 
-     if (fileTempGalleryBE != undefined || fileTempGalleryBE != "") {
-             file = fileTempGalleryBE
+     alert("fileTempGalleryBE : "+fileTempGalleryBE);
+     alert("fileTempCameraBE : "+fileTempCameraBE);
+
+     if (fileTempGalleryBE == undefined || fileTempGalleryBE == "") {
+            file = fileTempGalleryBE;
      } else {
          file = fileTempGalleryBE;
      }
 
-     if (fileTempCameraBE != undefined || fileTempCameraBE != "") {
-             file = fileTempCameraBE;
+     if (fileTempCameraBE == undefined || fileTempCameraBE == "") {
+            file = fileTempCameraBE;
      } else {
          file = fileTempCameraBE;
      }
@@ -4142,7 +4145,6 @@
          });
 
          alert("Record update successfully");
-         resetImageData();
 
      } else {
          alert("db not found, your browser does not support web sql!");
