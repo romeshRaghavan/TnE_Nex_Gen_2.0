@@ -1394,7 +1394,6 @@ function setPerUnitDetails(transaction, results) {
         perUnitDetailsJSON["isAttachmentReq"] = row.isAttachmentReq;
         showAttachmentmessage();
 
-alert("rate per unit : "+ document.getElementById("ratePerUnit"));
         document.getElementById("ratePerUnit").value = row.expRatePerUnit;
         document.getElementById("expAmt").value = "";
         document.getElementById("expUnit").value = "";
