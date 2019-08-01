@@ -38,6 +38,7 @@ var fromLocationWayPoint = "";
 var toLocationWayPoint = "";
 var profileImg = "";
 var enableDiv = "";  // Temporary for demo purpose
+var updateAttachment = ""; // For BE Edit
 
 j(document).ready(function() {
     document.addEventListener("deviceready", loaded, false);
@@ -2100,6 +2101,10 @@ function resetImageData() {
     fileTempGalleryTS = "";
 }
 
+function resetUpdateImage(){
+    updateAttachment = "";
+}
+
 function capturePhoto(status, voucher_type) {
 
     voucherType = voucher_type;
@@ -2121,6 +2126,7 @@ function onPhotoURISuccess(imageURI) {
     // Get image handle
     //
     resetImageData();
+    resetUpdateImage();
     if (voucherType == 'wallet') {
         smallImageWallet.style.display = 'block';
 
