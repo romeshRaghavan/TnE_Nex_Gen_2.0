@@ -1,4675 +1,3785 @@
- var appPageHistory = [];
- var jsonToBeSend = new Object();
- var jsonBEArr = [];
- var budgetingStatus;
- var gradeId;
- var unitId;
- var employeeId;
- var empFirstName;
- var successSyncStatusBE = false;
- var successSyncStatusTR = false;
-
- var successMsgForCurrency = "Currency synchronized successfully.";
- var errorMsgForCurrency = "Currency not synchronized successfully.";
-
- var app = {
-     // Application Constructor
-     initialize: function() {
-         this.bindEvents();
-     },
-     // Bind Event Listeners
-     //
-     // Bind any events that are required on startup. Common events are:
-     // 'load', 'deviceready', 'offline', and 'online'.
-     bindEvents: function() {
-         document.addEventListener("deviceready", this.onDeviceReady, false);
-     },
-
-     onDeviceReady: function() {
-         if (navigator.notification) { // Override default HTML alert with native dialog
-             window.alert = function(message) {
-                 navigator.notification.alert(
-                     message, // message
-                     null, // callback
-                     "Alert", // title
-                     'OK' // buttonName
-                 );
-             };
-         }
-         document.addEventListener("backbutton", function(e) {
-             goBackEvent();
-         }, false);
-         validateValidMobileUser();
-         document.addEventListener('onSMSArrive', function(e) {
-             saveIncomingSMSOnLocal(e);
-         }, false);
-     }
- };
-
- function goBack() {
-     var currentUser = getUserID();
-     var loginPath = defaultPagePath + 'loginPage.html';
-     var headerBackBtn = defaultPagePath + 'backbtnPage.html';
-     var headerCatMsg = defaultPagePath + 'categoryMsgPage.html';
-
-     if (currentUser == '') {
-         j('#mainContainer').load(loginPath);
-     } else {
-         //To check if the page that needs to be displayed is login page. So 'historylength-2'
-         var historylength = appPageHistory.length;
-         var goToPage = appPageHistory[historylength - 2];
-
-         if (goToPage !== null && goToPage == loginPath) {
-             return 0;
-         } else {
-             appPageHistory.pop();
-             var len = appPageHistory.length;
-             var pg = appPageHistory[len - 1];
-             if (pg == "app/pages/addAnExpense.html" || pg == "app/pages/addTravelSettlement.html") {
-
-                 j('#mainHeader').load(headerBackBtn);
-             } else if (pg == "app/pages/category.html") {
-
-                 j('#mainHeader').load(headerCatMsg);
-             }
-             if (!(pg == null)) {
-                 j('#mainContainer').load(pg);
-             }
-         }
-     }
- }
-
- function goBackEvent() {
-     var currentUser = getUserID();
-     var loginPath = defaultPagePath + 'loginPage.html';
-     var headerBackBtn = defaultPagePath + 'backbtnPage.html';
-     var headerCatMsg = defaultPagePath + 'categoryMsgPage.html';
-
-     if (currentUser == '') {
-         j('#mainContainer').load(loginPath);
-     } else {
-         //To check if the page that needs to be displayed is login page. So 'historylength-2'
-         var historylength = appPageHistory.length;
-         var goToPage = appPageHistory[historylength - 2];
-
-         if (goToPage !== null && goToPage == loginPath) {
-             return 0;
-         } else {
-             appPageHistory.pop();
-             var len = appPageHistory.length;
-             if (len == 0) {
-                 navigator.app.exitApp();
-                 //navigator.notification.confirm("Are you sure want to exit from App?", onConfirmExit, "Confirmation", "Yes,No");
-             } else {
-                 var pg = appPageHistory[len - 1];
-                 if (pg == "app/pages/addAnExpense.html") {
-
-                     j('#mainHeader').load(headerBackBtn);
-                 } else if (pg == "app/pages/category.html") {
-
-                     j('#mainHeader').load(headerCatMsg);
-                     forceCloseDropdown();
-                 }
-                 if (!(pg == null)) {
-                     j('#mainContainer').load(pg);
-                 }
-             }
-         }
-     }
- }
-
- function onConfirmExit(button) {
-     if (button == 2) { //If User select a No, then return back;
-         return;
-     } else {
-         navigator.app.exitApp(); // If user select a Yes, quit from the app.
-     }
- }
-
- //Local Database Create,Save,Display
-
- //Test for browser compatibility
- if (window.openDatabase) {
-
-     //Create the database the parameters are 1. the database name 2.version number 3. a description 4. the size of the database (in bytes) 1024 x 1024 = 1MB
-     var mydb = openDatabase("Expenzing", "0.1", "Expenzing", 1024 * 1024);
-     //create All tables using SQL for the database using a transaction
-     mydb.transaction(function(t) {
-         //t.executeSql("CREATE TABLE IF NOT EXISTS employeeDetails (id INTEGER PRIMARY KEY ASC, firstName TEXT, lastName TEXT, gradeId INTEGER, budgetingStatus CHAR(1),unitId INTEGER, status TEXT)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS currencyMst (currencyId INTEGER PRIMARY KEY ASC, currencyName TEXT)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS accountHeadMst (accountHeadId INTEGER PRIMARY KEY ASC, accHeadName TEXT)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS expNameMst (id INTEGER PRIMARY KEY ASC,expNameMstId INTEGER, expName TEXT, expIsFromToReq CHAR(1),accCodeId INTEGER NOT NULL,accHeadId INTEGER NOT NULL,  expIsUnitReq CHAR(1),expRatePerUnit Double, expFixedOrVariable CHAR(1), expFixedLimitAmt Double,expPerUnitActiveInative CHAR(1),isErReqd CHAR(1),limitAmountForER Double,isAttachmentReq CHAR(1),isEntiLineOrVoucherLevel CHAR(1),periodicity TEXT,isUnitPeriodic TEXT)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS businessExpDetails (busExpId INTEGER PRIMARY KEY ASC, accHeadId INTEGER REFERENCES accountHeadMst(accHeadId), expNameId INTEGER REFERENCES expNameMst(expNameId),expDate DATE, expFromLoc TEXT, expToLoc TEXT, expNarration TEXT, expUnit INTEGER, expAmt Double, currencyId INTEGER REFERENCES currencyMst(currencyId),isEntitlementExceeded TEXT,busExpAttachment BLOB,wayPointunitValue TEXT)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS walletMst (walletId INTEGER PRIMARY KEY ASC AUTOINCREMENT, walletAttachment  BLOB)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS travelModeMst (travelModeId INTEGER PRIMARY KEY ASC, travelModeName TEXT)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS travelCategoryMst (travelCategoryId INTEGER PRIMARY KEY ASC, travelCategoryName TEXT,travelModeId INTEGER)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS cityTownMst (cityTownId INTEGER PRIMARY KEY ASC, cityTownName TEXT)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS travelTypeMst (travelTypeId INTEGER PRIMARY KEY ASC, travelTypeName TEXT)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS travelAccountHeadMst (id INTEGER PRIMARY KEY ASC,accHeadId INTEGER, accHeadName TEXT, processId INTEGER)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS travelExpenseNameMst (id INTEGER PRIMARY KEY ASC,expenseNameId INTEGER, expenseName TEXT, isModeCategory char(1),accountCodeId INTEGER,accHeadId INTEGER REFERENCES travelAccountHeadMst(accHeadId))");
-         t.executeSql("CREATE TABLE IF NOT EXISTS travelSettleExpDetails (tsExpId INTEGER PRIMARY KEY ASC,travelRequestId INTEGER, accHeadId INTEGER REFERENCES travelAccountHeadMst(accHeadId), expNameId INTEGER REFERENCES travelExpenseNameMst(expenseNameId),expDate DATE,expNarration TEXT, expUnit INTEGER, expAmt Double, currencyId INTEGER REFERENCES currencyMst(currencyId),travelModeId INTEGER REFERENCES travelModeMst(travelModeId), travelCategoryId INTEGER REFERENCES travelCategoryMst(travelCategoryId), cityTownId INTEGER REFERENCES cityTownMst(cityTownId),tsExpAttachment BLOB)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS travelRequestDetails (travelRequestId INTEGER PRIMARY KEY ASC, travelRequestNo TEXT,title TEXT, accountHeadId INTEGER,travelStartDate DATE,travelEndDate DATE,travelDomOrInter CHAR(1), advanceRequested TEXT,advanceAmount INTEGER)");
-         /*         t.executeSql("CREATE TABLE IF NOT EXISTS travelRequestDetails (travelRequestId INTEGER PRIMARY KEY ASC, travelRequestNo TEXT,title TEXT, accountHeadId INTEGER,travelStartDate DATE,travelEndDate DATE,travelDomOrInter CHAR(1))");
-          */
-         t.executeSql("CREATE TABLE IF NOT EXISTS accountHeadEAMst (accountHeadId INTEGER PRIMARY KEY ASC, accHeadName TEXT)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS advanceType (advancetypeID INTEGER PRIMARY KEY ASC, advancetype TEXT)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS employeeAdvanceDetails (empAdvID INTEGER PRIMARY KEY ASC, emplAdvVoucherNo TEXT,empAdvTitle TEXT,Amount Double)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS currencyConversionMst (currencyCovId INTEGER PRIMARY KEY ASC, currencyId INTEGER REFERENCES currencyMst(currencyId), defaultcurrencyId INTEGER ,conversionRate Double)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS smsMaster (smsId INTEGER PRIMARY KEY ASC, smsText TEXT,senderAddr TEXT,smsSentDate TEXT,smsAmount TEXT)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS smsScrutinizerMst (ID INTEGER PRIMARY KEY ASC, filterText TEXT, filterFlag TEXT, status TEXT)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS delayMst (ID INTEGER PRIMARY KEY ASC, processId INTEGER, noOfDays INTEGER, restrictionStatus CHAR(1), status CHAR(1), moduleId INTEGER)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS perDiemTravelMst (ID INTEGER PRIMARY KEY ASC, companyId INTEGER, gradeId INTEGER, amount INTEGER, domCityTownId INTEGER, expenseHeadId INTEGER, currencyId INTEGER)");
-         t.executeSql("CREATE TABLE IF NOT EXISTS profileMst (profileId INTEGER PRIMARY KEY ASC AUTOINCREMENT,empId INTEGER, profileAttachment  BLOB)");
-
-     });
- } else {
-     alert(window.lang.translate('WebSQL is not supported by your browser!'));
- }
-
- //function to remove a employeeDetails from the database, passed the row id as it's only parameter
- function saveBusinessDetails(status) {
-     exceptionMessage = '';
-     if (mydb) {
-         //get the values of the text inputs
-         var exp_date = document.getElementById('expDate').value;
-         var exp_from_loc = document.getElementById('expFromLoc').value;
-         var exp_to_loc = document.getElementById('expToLoc').value;
-         var exp_narration = document.getElementById('expNarration').value;
-         var exp_unit = document.getElementById('expUnit').value;
-         var way_points = document.getElementById('wayPointunitValue').value;
-         var exp_amt = document.getElementById('expAmt').value;
-         var entitlement_exceeded = exceptionStatus;
-         exceptionStatus = "N";
-         var acc_head_id;
-         var acc_head_val;
-         var exp_name_id;
-         var exp_name_val;
-         var currency_id;
-         var currency_val;
-         var file;
-         if (j("#accountHead").select2('data') != null) {
-             acc_head_id = j("#accountHead").select2('data').id;
-             acc_head_val = j("#accountHead").select2('data').name;
-         } else {
-             acc_head_id = '-1';
-         }
-         if (j("#expenseName").select2('data') != null) {
-             exp_name_id = j("#expenseName").select2('data').id;
-             exp_name_val = j("#expenseName").select2('data').name;
-         } else {
-             exp_name_id = '-1';
-         }
-
-         if (j("#currency").select2('data') != null) {
-             currency_id = j("#currency").select2('data').id;
-             currency_val = j("#currency").select2('data').name;
-         } else {
-             currency_id = '-1';
-         }
-
-         if (fileTempGalleryBE == undefined || fileTempGalleryBE == "") {
-
-         } else {
-             file = fileTempGalleryBE;
-         }
-
-         if (fileTempCameraBE == undefined || fileTempCameraBE == "") {
-
-         } else {
-             file = fileTempCameraBE;
-         }
-
-         if (validateExpenseDetails(exp_date, exp_from_loc, exp_to_loc, exp_narration, exp_unit, exp_amt, acc_head_id, exp_name_id, currency_id, file)) {
-
-             j('#loading_Cat').show();
-
-             if (file == undefined) {
-                 file = "";
-             }
-
-             mydb.transaction(function(t) {
-                 t.executeSql("INSERT INTO businessExpDetails (expDate, accHeadId,expNameId,expFromLoc, expToLoc, expNarration, expUnit,expAmt,currencyId,isEntitlementExceeded,busExpAttachment,wayPointunitValue) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [exp_date, acc_head_id, exp_name_id, exp_from_loc, exp_to_loc, exp_narration, exp_unit, exp_amt, currency_id, entitlement_exceeded, file, way_points]);
-
-                 if (status == "0") {
-
-                     document.getElementById('expDate').value = "";
-                     document.getElementById('expFromLoc').value = "";
-                     document.getElementById('expToLoc').value = "";
-                     document.getElementById('expNarration').value = "";
-                     document.getElementById('expUnit').value = "";
-                     document.getElementById('expAmt').value = "";
-                     document.getElementById('wayPointunitValue').value = "";
-                     smallImageBE.style.display = 'none';
-                     smallImageBE.src = "";
-                     j('#errorMsgArea').children('span').text("");
-                     j('#accountHead').select2('data', '');
-                     j('#expenseName').select2('data', '');
-                     //j('#currency').select2('data', '');
-                     j('#loading_Cat').hide();
-                     //j('#syncSuccessMsg').empty();
-                     document.getElementById("syncSuccessMsg").innerHTML = "Expenses added successfully.";
-                     j('#syncSuccessMsg').hide().fadeIn('slow').delay(300).fadeOut('slow');
-                     resetImageData();
-                     //createBusinessExp();
-                 } else {
-                     viewBusinessExp();
-                 }
-             });
-
-         } else {
-             return false;
-         }
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-
-     }
- }
-
- function saveTravelSettleDetails(status) {
-     exceptionStatus = 'N';
-     exceptionMessage = '';
-
-     if (mydb) {
-         //get the values of the text inputs
-         var exp_date = document.getElementById('expDate').value;
-         var exp_narration = document.getElementById('expNarration').value;
-         var exp_unit = document.getElementById('expUnit').value;
-         var exp_amt = document.getElementById('expAmt').value;
-         var travelRequestId;
-         var acc_head_val;
-         var exp_name_id;
-         var exp_name_val;
-         var currency_id;
-         var currency_val;
-         var travelMode_id;
-         var travelMode_val;
-         var travelCategory_id;
-         var travelCategory_val;
-         var cityTown_id;
-         var cityTown_val;
-         var file;
-         if (j("#travelRequestName").select2('data') != null) {
-             travelRequestId = j("#travelRequestName").select2('data').id;
-             travelRequestNo = j("#travelRequestName").select2('data').name;
-         } else {
-             travelRequestId = '-1';
-         }
-
-         if (j("#travelExpenseName").select2('data') != null) {
-             exp_name_id = j("#travelExpenseName").select2('data').id;
-             exp_name_val = j("#travelExpenseName").select2('data').name;
-         } else {
-             exp_name_id = '-1';
-         }
-
-         if (j("#currency").select2('data') != null) {
-             currency_id = j("#currency").select2('data').id;
-             currency_val = j("#currency").select2('data').name;
-         } else {
-             currency_id = '-1';
-         }
-         if (j("#travelModeForTS").select2('data') != null) {
-             travelMode_id = j("#travelModeForTS").select2('data').id;
-             travelMode_val = j("#travelModeForTS").select2('data').name;
-         } else {
-             travelMode_id = '-1';
-         }
-         if (j("#travelCategoryForTS").select2('data') != null) {
-             travelCategory_id = j("#travelCategoryForTS").select2('data').id;
-             travelCategory_val = j("#travelCategoryForTS").select2('data').name;
-         } else {
-             travelCategory_id = '-1';
-         }
-         if (j("#Citytown").select2('data') != null) {
-             cityTown_id = j("#Citytown").select2('data').id;
-             cityTown_val = j("#Citytown").select2('data').name;
-         } else {
-             cityTown_id = '-1';
-         }
-         if (fileTempGalleryTS == undefined || fileTempGalleryTS == "") {
-
-         } else {
-             file = fileTempGalleryTS;
-         }
-
-         if (fileTempCameraTS == undefined || fileTempCameraTS == "") {
-
-         } else {
-             file = fileTempCameraTS;
-         }
-
-         if (validateTSDetails(exp_date, exp_narration, exp_unit, exp_amt, travelRequestId, exp_name_id, currency_id, travelMode_id, travelCategory_id, cityTown_id)) {
-             j('#loading_Cat').show();
-
-             if (file == undefined) {
-                 file = "";
-             }
-             mydb.transaction(function(t) {
-                 t.executeSql("INSERT INTO travelSettleExpDetails  (expDate, travelRequestId,expNameId,expNarration, expUnit,expAmt,currencyId,travelModeId,travelCategoryId,cityTownId,tsExpAttachment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [exp_date, travelRequestId, exp_name_id, exp_narration, exp_unit, exp_amt, currency_id, travelMode_id, travelCategory_id, cityTown_id, file]);
-
-                 if (status == "0") {
-                     document.getElementById('expDate').value = "";
-                     document.getElementById('expNarration').value = "";
-                     document.getElementById('expUnit').value = "";
-                     document.getElementById('expAmt').value = "";
-                     j('#travelRequestName').select2('data', '');
-                     j('#travelExpenseName').select2('data', '');
-                     j('#travelModeForTS').select2('data', '');
-                     j('#travelCategoryForTS').select2('data', '');
-                     j('#Citytown').select2('data', '');
-                     j("label[for='startDate']").html("");
-                     j("label[for='endDate']").html("");
-                     smallImageTS.style.display = 'none';
-                     smallImageTS.src = "";
-                     j('#loading_Cat').hide();
-                     //j('#syncSuccessMsg').empty();
-                     document.getElementById("syncSuccessMsg").innerHTML = "Expenses added successfully.";
-                     j('#syncSuccessMsg').hide().fadeIn('slow').delay(300).fadeOut('slow');
-                     resetImageData();
-                 } else {
-                     viewTravelSettlementExp();
-                 }
-             });
-
-         } else {
-             return false;
-         }
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function create_blob(file, callback) {
-     var reader = new FileReader();
-     reader.onload = function() {
-         callback(reader.result);
-     };
-     if (typeof file == 'undefined') {
-         file = new Blob();
-     }
-     reader.readAsDataURL(file);
- }
-
- var jsonExpenseDetailsArr = [];
-
- function fetchExpenseClaim() {
-     mytable = j('<table></table>').attr({
-         id: "source",
-         class: ["table", "table-striped", "table-bordered"].join(' ')
-     });
-     var rowThead = j("<thead></thead>").appendTo(mytable);
-     var rowTh = j('<tr></tr>').attr({
-         class: ["test"].join(' ')
-     }).appendTo(rowThead);
-
-     j('<th lang=\'en\'></th>').text("Date").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Expense Name").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Narration From/To Loc").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Amt").appendTo(rowTh);
-     var cols = new Number(5);
-
-     mydb.transaction(function(t) {
-         var headerOprationBtn;
-         t.executeSql('SELECT * FROM businessExpDetails INNER JOIN expNameMst ON businessExpDetails.expNameId =expNameMst.id INNER JOIN currencyMst ON businessExpDetails.currencyId =currencyMst.currencyId INNER JOIN accountHeadMst ON businessExpDetails.accHeadId =accountHeadMst.accountHeadId;', [],
-             function(transaction, result) {
-                 if (result != null && result.rows != null) {
-
-                     for (var i = 0; i < result.rows.length; i++) {
-
-                         var row = result.rows.item(i);
-                         var shrinkFromTo;
-                         var newDateFormat = reverseConvertDate(row.expDate.substring(0, 2)) + "-" + row.expDate.substring(3, 5) + " " + row.expDate.substring(6, 10);
-
-                         if (window.localStorage.getItem("MobileMapRole") == 'true') {
-                             if (row.expFromLoc != '' && row.expToLoc != '') {
-                                 var shrinkNarration = row.expNarration.substring(0, row.expNarration.indexOf("--"))
-                                 srinckFromTo = row.expFromLoc.substring(0, row.expFromLoc.indexOf(",")) + "/" + row.expToLoc.substring(0, row.expToLoc.indexOf(","));
-                                 srinckFromTo = srinckFromTo.concat("...");
-                             }
-                         }
-
-                         var rowss = j('<tr></tr>').attr({
-                             class: ["test"].join(' ')
-                         }).appendTo(mytable);
-
-                         j('<td></td>').attr({
-                             class: ["expDate"].join(' ')
-                         }).html('<p style="color: black;">' + newDateFormat + '</P>').appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expName"].join(' ')
-                         }).html('<p style="color: black;">' + row.expName + '</P>').appendTo(rowss).appendTo(rowss);
-                         if (window.localStorage.getItem("MobileMapRole") == 'true') {
-                             if (row.expFromLoc != '' && row.expToLoc != '') {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p style="color: black;">' + shrinkNarration + '</br>' + srinckFromTo + '</P>').appendTo(rowss);
-                             } else {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p style="color: black;">' + row.expNarration + '</br>' + row.expFromLoc + "" + row.expToLoc + '</P>').appendTo(rowss);
-                             }
-                         } else {
-                             if (row.expFromLoc != '' && row.expToLoc != '') {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p style="color: black;">' + row.expNarration + '</br>' + row.expFromLoc + "/" + row.expToLoc + '</P>').appendTo(rowss);
-                             } else {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p style="color: black;">' + row.expNarration + '</br>' + row.expFromLoc + "" + row.expToLoc + '</P>').appendTo(rowss);
-                             }
-                         }
-
-                         if (row.busExpAttachment.length == 0) {
-                             j('<td></td>').attr({
-                                 class: ["expAmt"].join(' ')
-                             }).html('<p style="color: black;">' + row.expAmt + ' ' + row.currencyName + '</P>').appendTo(rowss);
-                         } else {
-                             j('<td></td>').attr({
-                                 class: ["expAmt"].join(' ')
-                             }).html('<p style="color: black;">' + row.expAmt + ' ' + row.currencyName + '</P><img src="images/attach.png" width="25px" height="25px">').appendTo(rowss);
-                         }
-                         j('<td></td>').attr({
-                             class: ["expDate1", "displayNone"].join(' ')
-                         }).text(row.expDate).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expFromLoc1", "displayNone"].join(' ')
-                         }).text(row.expFromLoc).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expToLoc1", "displayNone"].join(' ')
-                         }).text(row.expToLoc).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expNarration1", "displayNone"].join(' ')
-                         }).text(row.expNarration).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expAmt1", "displayNone"].join(' ')
-                         }).text(row.expAmt).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["busAttachment", "displayNone"].join(' ')
-                         }).text(row.busExpAttachment).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["accHeadId", "displayNone"].join(' ')
-                         }).text(row.accHeadId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expNameId", "displayNone"].join(' ')
-                         }).text(row.expNameMstId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expUnit", "displayNone"].join(' ')
-                         }).text(row.expUnit).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["currencyId", "displayNone"].join(' ')
-                         }).text(row.currencyId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["accountCodeId", "displayNone"].join(' ')
-                         }).text(row.accCodeId).appendTo(rowss);
-                         //j('<td></td>').attr({ class: ["expName","displayNone"].join(' ') }).text(row.expName).appendTo(rowss);       
-                         j('<td></td>').attr({
-                             class: ["busExpId", "displayNone"].join(' ')
-                         }).text(row.busExpId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isErReqd", "displayNone"].join(' ')
-                         }).text(row.isErReqd).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["ERLimitAmt", "displayNone"].join(' ')
-                         }).text(row.limitAmountForER).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isEntitlementExceeded", "displayNone"].join(' ')
-                         }).text(row.isEntitlementExceeded).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["wayPoint", "displayNone"].join(' ')
-                         }).text(row.wayPointunitValue).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isAttachmentReq", "displayNone"].join(' ')
-                         }).text(row.isAttachmentReq).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isEntiLineOrVoucherLevel", "displayNone"].join(' ')
-                         }).text(row.isEntiLineOrVoucherLevel).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expFixedLimitAmt", "displayNone"].join(' ')
-                         }).text(row.expFixedLimitAmt).appendTo(rowss);
-                     }
-
-                     j("#source tr").click(function() {
-                         headerOprationBtn = defaultPagePath + 'headerPageForBEOperation.html';
-                         if (j(this).hasClass("selected")) {
-                             var headerBackBtn = defaultPagePath + 'headerPageForBEOperation.html';
-                             j(this).removeClass('selected');
-                             j('#mainHeader').load(headerBackBtn);
-                         } else {
-                             if (j(this).text() == 'DateExpense NameNarration From/To LocAmt') {
-
-                             } else {
-                                 j('#mainHeader').load(headerOprationBtn);
-                                 j(this).addClass('selected');
-                             }
-                         }
-                     });
-                 }
-             });
-     });
-     mytable.appendTo("#box");
-     var header = defaultPagePath + 'backbtnPage.html';
-     j('#mainHeader').load(header);
- }
-
- function validateAccountHead() {
-     var map = new Map();
-
-     if (j("#source tr.selected").hasClass("selected")) {
-         j("#source tr.selected").each(function(index, row) {
-
-             var currentAccountHeadID = j(this).find('td.accHeadId').text();
-
-             if (map.has(currentAccountHeadID)) {
-                 var value = map.get(currentAccountHeadID);
-
-                 map.set(currentAccountHeadID, currentAccountHeadID);
-             } else {
-                 map.set(currentAccountHeadID, currentAccountHeadID);
-             }
-
-         });
-     }
-     if (map.size == 1) {
-         return true;
-     } else {
-         return false;
-     }
- }
-
- function fetchTravelSettlementExp() {
-
-     mytable = j('<table></table>').attr({
-         id: "source",
-         class: ["table", "table-striped", "table-bordered"].join(' ')
-     });
-
-     var rowThead = j("<thead></thead>").appendTo(mytable);
-     var rowTh = j('<tr></tr>').attr({
-         class: ["test"].join(' ')
-     }).appendTo(rowThead);
-
-     j('<th lang=\'en\'></th>').text("Date").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Expense Name").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Amt").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("cityTown").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Narration").appendTo(rowTh);
-
-     var cols = new Number(4);
-
-     mydb.transaction(function(t) {
-
-         t.executeSql('select * from travelSettleExpDetails inner join cityTownMst on cityTownMst.cityTownId = travelSettleExpDetails.cityTownId inner join currencyMst on travelSettleExpDetails.currencyId = currencyMst.currencyId inner join travelExpenseNameMst on travelExpenseNameMst.id = travelSettleExpDetails.expNameId;', [],
-             function(transaction, result) {
-
-                 if (result != null && result.rows != null) {
-
-                     for (var i = 0; i < result.rows.length; i++) {
-
-                         var row = result.rows.item(i);
-
-                         var newDateFormat = reverseConvertDate(row.expDate.substring(0, 2)) + "-" + row.expDate.substring(3, 5) + " " + row.expDate.substring(6, 10);
-
-                         var rowss = j('<tr></tr>').attr({
-                             class: ["test"].join(' ')
-                         }).appendTo(mytable);
-
-                         j('<td></td>').attr({
-                             class: ["expDate"].join(' ')
-                         }).html('<p style="color: black;">' + newDateFormat + '</P>').appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expenseName"].join(' ')
-                         }).html('<p style="color: black;">' + row.expenseName + '</P>').appendTo(rowss).appendTo(rowss);
-
-                         j('<td></td>').attr({
-                             class: ["expAmt"].join(' ')
-                         }).html('<p style="color: black;">' + row.expAmt + ' ' + row.currencyName + '</P>').appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["cityTownName"].join(' ')
-                         }).html('<p style="color: black;">' + row.cityTownName + '</P>').appendTo(rowss);
-
-                         if (row.tsExpAttachment.length == 0) {
-                             j('<td></td>').attr({
-                                 class: ["expNarration"].join(' ')
-                             }).html('<p style="color: black;">' + row.expNarration + '</P>').appendTo(rowss);
-                         } else {
-                             j('<td></td>').attr({
-                                 class: ["expNarration"].join(' ')
-                             }).html('<p style="color: black;">' + row.expNarration + '</P><img src="images/attach.png" width="25px" height="25px">').appendTo(rowss);
-                         }
-                         j('<td></td>').attr({
-                             class: ["expDate1", "displayNone"].join(' ')
-                         }).text(row.expDate).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expAmt1", "displayNone"].join(' ')
-                         }).text(row.expAmt).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expNarration1", "displayNone"].join(' ')
-                         }).text(row.expNarration).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["travelRequestId", "displayNone"].join(' ')
-                         }).text(row.travelRequestId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["tsExpAttachment", "displayNone"].join(' ')
-                         }).text(row.tsExpAttachment).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expNameId", "displayNone"].join(' ')
-                         }).text(row.expenseNameId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expUnit", "displayNone"].join(' ')
-                         }).text(row.expUnit).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["currencyId", "displayNone"].join(' ')
-                         }).text(row.currencyId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["modeId", "displayNone"].join(' ')
-                         }).text(row.travelModeId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["categoryId", "displayNone"].join(' ')
-                         }).text(row.travelCategoryId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["fromcityTownId", "displayNone"].join(' ')
-                         }).text(row.cityTownId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["accountCodeId", "displayNone"].join(' ')
-                         }).text(row.accCodeId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expName", "displayNone"].join(' ')
-                         }).text(row.expenseName).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["tsExpId", "displayNone"].join(' ')
-                         }).text(row.tsExpId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isModeCategory", "displayNone"].join(' ')
-                         }).text(row.isModeCategory).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["accountCodeId", "displayNone"].join(' ')
-                         }).text(row.accountCodeId).appendTo(rowss);
-                     }
-
-                     j("#source tr").click(function() {
-                         headerOprationBtn = defaultPagePath + 'headerPageForTSOperation.html';
-                         if (j(this).hasClass("selected")) {
-                             var headerBackBtn = defaultPagePath + 'headerPageForTSOperation.html';
-                             j(this).removeClass('selected');
-                             j('#mainHeader').load(headerBackBtn);
-                         } else {
-                             if (j(this).text() == 'DateExpense NameAmtcityTownNarration') {
-
-                             } else {
-                                 j('#mainHeader').load(headerOprationBtn);
-                                 j(this).addClass('selected');
-                             }
-                         }
-                     });
-                 }
-             });
-     });
-     mytable.appendTo("#box");
-     var header = defaultPagePath + 'backbtnPage.html';
-     j('#mainHeader').load(header);
- }
-
- function synchronizeBEMasterData() {
-     var jsonSentToSync = new Object();
-
-     jsonSentToSync["BudgetingStatus"] = window.localStorage.getItem("BudgetingStatus");
-     jsonSentToSync["EmployeeId"] = window.localStorage.getItem("EmployeeId");
-     jsonSentToSync["GradeId"] = window.localStorage.getItem("GradeID");
-     jsonSentToSync["UnitId"] = window.localStorage.getItem("UnitId");
-     j('#loading_Cat').show();
-     if (mydb) {
-         j.ajax({
-             url: window.localStorage.getItem("urlPath") + "SyncAccountHeadWebService",
-             type: 'POST',
-             dataType: 'json',
-             crossDomain: true,
-             data: JSON.stringify(jsonSentToSync),
-             success: function(data) {
-                 if (data.Status == 'Success') {
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM accountHeadMst");
-                         var accountHeadArray = data.AccountHeadArray;
-
-                         if (accountHeadArray != null && accountHeadArray.length > 0) {
-                             for (var i = 0; i < accountHeadArray.length; i++) {
-                                 var stateArr = new Array();
-                                 stateArr = accountHeadArray[i];
-                                 var acc_head_id = stateArr.Value;
-                                 var acc_head_name = stateArr.Label;
-                                 t.executeSql("INSERT INTO accountHeadMst (accountHeadId,accHeadName) VALUES (?, ?)", [acc_head_id, acc_head_name]);
-
-                             }
-                         }
-                     });
-
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM expNameMst");
-                         var expNameArray = data.ExpenseNameArray;
-                         if (expNameArray != null && expNameArray.length > 0) {
-                             for (var i = 0; i < expNameArray.length; i++) {
-                                 var stateArr = new Array();
-                                 stateArr = expNameArray[i];
-                                 var exp_id = stateArr.ExpenseID;
-                                 var exp_name = stateArr.ExpenseName;
-                                 var exp_is_from_to_req = stateArr.IsFromToRequired;
-                                 var acc_code_id = stateArr.AccountCodeId;
-                                 var acc_head_id = stateArr.AccountHeadId;
-                                 var isErReqd;
-                                 var limitAmountForER;
-                                 var exp_is_unit_req;
-                                 var exp_per_unit;
-                                 var exp_fixed_or_var;
-                                 var exp_fixed_limit_amt;
-                                 var isAttachmentReq;
-                                 var isEntiLineOrVoucherLevel;
-                                 var periodicity;
-                                 var isUnitPeriodic;
-
-                                 if (typeof stateArr.FixedOrVariable != 'undefined') {
-                                     exp_fixed_or_var = stateArr.FixedOrVariable;
-                                 } else {
-                                     exp_fixed_or_var = 'V';
-                                 }
-
-                                 if (typeof stateArr.IsUnitRequired != 'undefined') {
-                                     exp_is_unit_req = stateArr.IsUnitRequired;
-                                     if (exp_is_unit_req == 'N')
-                                         exp_fixed_or_var = 'V';
-                                 } else {
-                                     exp_is_unit_req = 'N';
-                                 }
-
-                                 if (typeof stateArr.RatePerUnit != 'undefined') {
-                                     exp_per_unit = stateArr.RatePerUnit;
-                                 } else {
-                                     exp_per_unit = 0.0;
-                                 }
-
-                                 if (typeof stateArr.ActiveInactive != 'undefined') {
-                                     exp_per_unit_active_inactive = stateArr.ActiveInactive;
-                                 } else {
-                                     exp_per_unit_active_inactive = 0;
-                                 }
-
-                                 if (typeof stateArr.FixedLimitAmount != 'undefined') {
-                                     exp_fixed_limit_amt = stateArr.FixedLimitAmount;
-                                 } else {
-                                     exp_fixed_limit_amt = 0.0;
-                                 }
-                                 if (typeof stateArr.IsErReqd != 'undefined') {
-                                     isErReqd = stateArr.IsErReqd;
-                                 } else {
-                                     isErReqd = 'N';
-                                 }
-                                 if (typeof stateArr.LimitAmountForER != 'undefined') {
-                                     limitAmountForER = stateArr.LimitAmountForER;
-                                 } else {
-                                     limitAmountForER = 0.0;
-                                 }
-                                 if (typeof stateArr.IsAttachmentReq != 'undefined') {
-                                     isAttachmentReq = stateArr.IsAttachmentReq;
-                                 } else {
-                                     isAttachmentReq = 'N';
-                                 }
-                                 if (typeof stateArr.IsEntiLineOrVoucherLevel != 'undefined') {
-                                     isEntiLineOrVoucherLevel = stateArr.IsEntiLineOrVoucherLevel;
-                                 } else {
-                                     isEntiLineOrVoucherLevel = 'V';
-                                 }
-
-                                 if (typeof stateArr.Periodicity != 'undefined') {
-                                     periodicity = stateArr.Periodicity;
-                                 } else {
-                                     periodicity = 'N';
-                                 }
-                                 if (typeof stateArr.IsUnitPeriodic != 'undefined') {
-                                     isUnitPeriodic = stateArr.IsUnitPeriodic;
-                                 } else {
-                                     isUnitPeriodic = 'N';
-                                 }
-                                 //console.log("exp_id:"+exp_id+"  -exp_name:"+exp_name+"  -exp_is_from_to_req:"+exp_is_from_to_req+"  -acc_code_id:"+acc_code_id+"  -acc_head_id:"+acc_head_id+"  -exp_is_unit_req:"+exp_is_unit_req+"  -exp_per_unit:"+exp_per_unit+"  -exp_fixed_or_var:"+exp_fixed_or_var+"  -exp_fixed_limit_amt:"+exp_fixed_limit_amt)                                        
-                                 t.executeSql("INSERT INTO expNameMst ( expNameMstId,expName, expIsFromToReq , accCodeId , accHeadId , expIsUnitReq , expRatePerUnit, expFixedOrVariable , expFixedLimitAmt,expPerUnitActiveInative,isErReqd,limitAmountForER,isAttachmentReq,isEntiLineOrVoucherLevel,periodicity,isUnitPeriodic) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [exp_id, exp_name, exp_is_from_to_req, acc_code_id, acc_head_id, exp_is_unit_req, exp_per_unit, exp_fixed_or_var, exp_fixed_limit_amt, exp_per_unit_active_inactive, isErReqd, limitAmountForER, isAttachmentReq, isEntiLineOrVoucherLevel, periodicity, isUnitPeriodic]);
-                             }
-                         }
-                     });
-
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM currencyConversionMst");
-                         var currencyConvArray = data.CurrencyConvArray;
-                         if (currencyConvArray != null && currencyConvArray.length > 0) {
-                             for (var i = 0; i < currencyConvArray.length; i++) {
-                                 var stateArr = new Array();
-                                 stateArr = currencyConvArray[i];
-                                 var currencyCovId = stateArr.currencyCovId;
-                                 var currencyId = stateArr.currencyId;
-                                 var defaultcurrencyId = stateArr.defaultcurrencyId;
-                                 var conversionRate = stateArr.conversionRate;
-                                 t.executeSql("INSERT INTO currencyConversionMst (currencyCovId,currencyId,defaultcurrencyId,conversionRate) VALUES (?, ?, ?, ?)", [currencyCovId, currencyId, defaultcurrencyId, conversionRate]);
-
-                             }
-                         }
-                     });
-
-                     j('#loading_Cat').hide();
-                     document.getElementById("syncSuccessMsg").innerHTML = "Business Expenses synchronized successfully.";
-                     j('#syncSuccessMsg').hide().fadeIn('slow').delay(500).fadeOut('slow');
-
-                 } else {
-                     j('#loading_Cat').hide();
-                     document.getElementById("syncFailureMsg").innerHTML = "Business Expenses not synchronized successfully.";
-                     j('#syncFailureMsg').hide().fadeIn('slow').delay(300).fadeOut('slow');
-
-                 }
-
-             },
-             error: function(data) {
-                 alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-             }
-         });
-
-         j.ajax({
-             url: window.localStorage.getItem("urlPath") + "CurrencyService",
-             type: 'POST',
-             dataType: 'json',
-             crossDomain: true,
-             data: JSON.stringify(jsonSentToSync),
-             success: function(data) {
-                 if (data.Status == 'Success') {
-                     var currencyArray = data.CurrencyArray;
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM currencyMst");
-                         if (currencyArray != null && currencyArray.length > 0) {
-                             for (var i = 0; i < currencyArray.length; i++) {
-                                 var stateArr = new Array();
-                                 stateArr = currencyArray[i];
-                                 var curr_id = stateArr.Value;
-                                 var curr_name = stateArr.Label;
-                                 t.executeSql("INSERT INTO currencyMst (currencyId,currencyName) VALUES (?, ?)", [curr_id, curr_name]);
-
-                             }
-                         }
-                     });
-                     j('#loading_Cat').hide();
-                     document.getElementById("syncFailureMsg").innerHTML = successMsgForCurrency;
-                     j('#syncFailureMsg').hide().fadeIn('slow').delay(300).fadeOut('slow');
-
-                 } else {
-                     j('#loading_Cat').hide();
-                     document.getElementById("syncFailureMsg").innerHTML = "Currency not synchronized successfully.";;
-                     j('#syncFailureMsg').hide().fadeIn('slow').delay(300).fadeOut('slow');
-
-                 }
-
-             },
-             error: function(data) {
-                 alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-             }
-         });
-
-     } else {
-
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
-
- }
-
- function synchronizeTRMasterData() {
-     var jsonSentToSync = new Object();
-     j('#loading_Cat').show();
-     jsonSentToSync["BudgetingStatus"] = window.localStorage.getItem("BudgetingStatus");
-     jsonSentToSync["EmployeeId"] = window.localStorage.getItem("EmployeeId");
-     jsonSentToSync["GradeId"] = window.localStorage.getItem("GradeID");
-     jsonSentToSync["UnitId"] = window.localStorage.getItem("UnitId");
-
-     if (mydb) {
-         j.ajax({
-             url: window.localStorage.getItem("urlPath") + "SyncTravelAccountHeadWebService",
-             type: 'POST',
-             dataType: 'json',
-             crossDomain: true,
-             data: JSON.stringify(jsonSentToSync),
-             success: function(data) {
-                 if (data.Status == 'Success') {
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM travelAccountHeadMst");
-
-                         var accountHeadArray = data.AccountHeadArray;
-                         if (accountHeadArray != null && accountHeadArray.length > 0) {
-                             for (var i = 0; i < accountHeadArray.length; i++) {
-                                 var stateArr = new Array();
-                                 stateArr = accountHeadArray[i];
-                                 var acc_head_id = stateArr.AccountHeadId;
-                                 var acc_head_name = stateArr.AccountHeadName;
-                                 var process_id = stateArr.ProcessId;
-                                 t.executeSql("INSERT INTO travelAccountHeadMst (accHeadId,accHeadName,processId) VALUES (?, ?, ?)", [acc_head_id, acc_head_name, process_id]);
-                             }
-                         }
-                         t.executeSql("DELETE FROM travelExpenseNameMst");
-                         var expenseNameArray = data.ExpenseHeadArray;
-                         if (expenseNameArray != null && expenseNameArray.length > 0) {
-                             for (var i = 0; i < expenseNameArray.length; i++) {
-                                 var stateArr = new Array();
-                                 stateArr = expenseNameArray[i];
-                                 var expense_id = stateArr.ExpenseHeadId;
-                                 var expense_name = stateArr.ExpenseHeadName;
-                                 var account_code_id = stateArr.AccountCodeId;
-                                 var is_mode_cotegory = stateArr.isModeCategory;
-                                 var account_head_id = stateArr.AccountHeadId;
-                                 t.executeSql("INSERT INTO travelExpenseNameMst (expenseNameId ,expenseName ,accountCodeId,isModeCategory,accHeadId) VALUES (?, ?, ?, ?,?)", [expense_id, expense_name, account_code_id, is_mode_cotegory, account_head_id]);
-                             }
-                         }
-                     });
-                     //j('#syncSuccessMsg').empty();
-                     //document.getElementById("syncSuccessMsg").innerHTML = "Account Head synchronized Successfully.";
-                     // j('#syncSuccessMsg').hide().fadeIn('slow').delay(300).fadeOut('slow');
-
-                 } else {
-
-                     document.getElementById("syncFailureMsg").innerHTML = "Account Head Not synchronized Successfully.";
-                     j('#syncFailureMsg').hide().fadeIn('slow').delay(300).fadeOut('slow');
-                 }
-             },
-             error: function(data) {
-                 alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-             }
-
-         });
-
-         j.ajax({
-             url: window.localStorage.getItem("urlPath") + "CurrencyService",
-             type: 'POST',
-             dataType: 'json',
-             crossDomain: true,
-             data: JSON.stringify(jsonSentToSync),
-             success: function(data) {
-                 if (data.Status == 'Success') {
-                     var currencyArray = data.CurrencyArray;
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM currencyMst");
-                         if (currencyArray != null && currencyArray.length > 0) {
-                             for (var i = 0; i < currencyArray.length; i++) {
-                                 var stateArr = new Array();
-                                 stateArr = currencyArray[i];
-                                 var curr_id = stateArr.Value;
-                                 var curr_name = stateArr.Label;
-                                 t.executeSql("INSERT INTO currencyMst (currencyId,currencyName) VALUES (?, ?)", [curr_id, curr_name]);
-
-                             }
-                         }
-                     });
-                     document.getElementById("syncSuccessMsg").innerHTML = successMsgForCurrency;
-                     j('#syncSuccessMsg').hide().fadeIn('slow').delay(300).fadeOut('slow');
-
-                 } else {
-
-                     document.getElementById("syncFailureMsg").innerHTML = errorMsgForCurrency;
-                     j('#syncFailureMsg').hide().fadeIn('slow').delay(300).fadeOut('slow');
-
-                 }
-
-             },
-             error: function(data) {
-                 alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-             }
-         });
-
-         j.ajax({
-             url: window.localStorage.getItem("urlPath") + "SyncTravelMaster",
-             type: 'POST',
-             dataType: 'json',
-             crossDomain: true,
-             data: JSON.stringify(jsonSentToSync),
-             success: function(data) {
-                 if (data.Status == 'Success') {
-
-                     // Used to store data when json object is returned in web service.
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM travelModeMst");
-                         var modesJSONArray = data.ModesJSONArray;
-                         if (modesJSONArray != null && modesJSONArray.length > 0) {
-                             for (var i = 0; i < modesJSONArray.length; i++) {
-                                 var stateArr = new Array();
-                                 stateArr = modesJSONArray[i];
-                                 var travel_mode_id = stateArr.TravelModeId;
-                                 var travel_mode_name = stateArr.TravelModeName;
-                                 t.executeSql("INSERT INTO travelModeMst (travelModeId,travelModeName) VALUES (?, ?)", [travel_mode_id, travel_mode_name]);
-
-                             }
-                         }
-                     });
-
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM cityTownMst");
-                         var cityTownJSONArray = data.CityTownJSONArray;
-                         if (cityTownJSONArray != null && cityTownJSONArray.length > 0) {
-                             for (var i = 0; i < cityTownJSONArray.length; i++) {
-                                 var stateArr = new Array();
-                                 stateArr = cityTownJSONArray[i];
-                                 var citytown_id = stateArr.CityTownId;
-                                 var citytown_name = stateArr.CityTownName;
-                                 t.executeSql("INSERT INTO cityTownMst (cityTownId,cityTownName) VALUES (?, ?)", [citytown_id, citytown_name]);
-
-                             }
-                         }
-                     });
-
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM travelCategoryMst");
-                         var categoryJSONArray = data.CategoryJSONArray;
-                         if (categoryJSONArray != null && categoryJSONArray.length > 0) {
-                             for (var i = 0; i < categoryJSONArray.length; i++) {
-                                 var stateArr = new Array();
-                                 stateArr = categoryJSONArray[i];
-                                 var trabel_category_id = stateArr.TravelCategoryId;
-                                 var travel_category_name = stateArr.TravelCategoryName;
-                                 var trabel_mode_id = stateArr.TravelModeId;
-                                 t.executeSql("INSERT INTO travelCategoryMst (travelCategoryId,travelCategoryName,travelModeId) VALUES (?, ?, ?)", [trabel_category_id, travel_category_name, trabel_mode_id]);
-
-                             }
-                         }
-                     });
-                     document.getElementById("syncFailureMsg").innerHTML = "Category/CityTown Master synchronized successfully.";
-                     j('#syncFailureMsg').hide().fadeIn('slow').delay(200).fadeOut('slow');
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM travelTypeMst");
-                         var travelTypeJSONArray = data.TravelTypeJSONArray;
-                         if (travelTypeJSONArray != null && travelTypeJSONArray.length > 0) {
-                             for (var i = 0; i < travelTypeJSONArray.length; i++) {
-                                 var stateArr = new Array();
-                                 stateArr = travelTypeJSONArray[i];
-                                 var travel_type_id = stateArr.TravelTypeId;
-                                 var travel_type_name = stateArr.TravelTypeName;
-                                 t.executeSql("INSERT INTO travelTypeMst (travelTypeId,travelTypeName) VALUES (?, ?)", [travel_type_id, travel_type_name]);
-
-                             }
-                         }
-                     });
-                     // *********************************   Delay - Master - Start   *******************************************************//
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM delayMst");
-                         var delayMasterJSONArray = data.DelayMasterJSONArray;
-                         if (delayMasterJSONArray != null && delayMasterJSONArray.length > 0) {
-                             for (var i = 0; i < delayMasterJSONArray.length; i++) {
-                                 var delayMstArr = new Array();
-                                 delayMstArr = delayMasterJSONArray[i];
-                                 var process_id = delayMstArr.ProcessId;
-                                 var no_Of_Days = delayMstArr.NoOfDaysAllowed;
-                                 var restriction_Status = delayMstArr.RestrictionStatus;
-                                 var status = delayMstArr.Status;
-                                 var module_Id = delayMstArr.ModuleId;
-
-                                 t.executeSql("INSERT INTO delayMst (processId , noOfDays, restrictionStatus, status, moduleId ) VALUES (?, ?, ?, ?, ?)", [process_id, no_Of_Days, restriction_Status, status, module_Id]);
-
-                             }
-                         }
-                     });
-                     // *********************************   Delay - Master - End   *******************************************************//
-
-                     // *********************************   Travel PerDiem - Master - Start   *******************************************************//
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM perDiemTravelMst");
-                         var perDiemDomesticJSONArray = data.PerDiemDomesticJSONArray;
-                         if (perDiemDomesticJSONArray != null && perDiemDomesticJSONArray.length > 0) {
-                             for (var i = 0; i < perDiemDomesticJSONArray.length; i++) {
-                                 var perDiemMstArr = new Array();
-                                 perDiemMstArr = perDiemDomesticJSONArray[i];
-                                 var company_id = perDiemMstArr.CompanyId;
-                                 var grade_Id = perDiemMstArr.GradeId;
-                                 var amount = perDiemMstArr.Amount;
-                                 var dom_City_Town_Id = perDiemMstArr.DomCityTownId;
-                                 var exp_Head_Id = perDiemMstArr.ExpenseHeadId;
-                                 var currency_Id = perDiemMstArr.CurrencyId;
-
-                                 t.executeSql("INSERT INTO perDiemTravelMst (companyId , gradeId, amount, domCityTownId, expenseHeadId, currencyId ) VALUES (?, ?, ?, ?, ?, ?)", [company_id, grade_Id, amount, dom_City_Town_Id, exp_Head_Id, currency_Id]);
-
-                             }
-                         }
-                     });
-                     // *********************************   Travel PerDiem - Master - End   *******************************************************//
-
-                     j('#loading_Cat').hide();
-
-                 } else {
-                     j('#loading_Cat').hide();
-                     document.getElementById("syncFailureMsg").innerHTML = "Travel Required master Expenses not synchronized successfully.";
-                     j('#syncFailureMsg').hide().fadeIn('slow').delay(300).fadeOut('slow');
-                 }
-             },
-             error: function(data) {
-                 alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-             }
-         });
-
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function onloadExpense() {
-     if (mydb) {
-         mydb.transaction(function(t) {
-             t.executeSql("SELECT * FROM accountHeadMst", [], getAccHeadList);
-             t.executeSql("SELECT * FROM currencyMst", [], getCurrencyList);
-             t.executeSql("SELECT * FROM expNameMst", [], getExpNameList);
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function getAccHeadList(transaction, results) {
-     var i;
-     var jsonAccHeadArr = [];
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindAccHead = new Object();
-         jsonFindAccHead["Label"] = row.accountHeadId;
-         jsonFindAccHead["Value"] = row.accHeadName;
-         jsonAccHeadArr.push(jsonFindAccHead);
-     }
-     createAccHeadDropDown(jsonAccHeadArr);
- }
-
- function getTrAccHeadList(transaction, results) {
-     var i;
-     var jsonAccHeadArr = [];
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindAccHead = new Object();
-         jsonFindAccHead["Label"] = row.accHeadId;
-         jsonFindAccHead["Value"] = row.accHeadName;
-         jsonAccHeadArr.push(jsonFindAccHead);
-     }
-     createTRAccHeadDropDown(jsonAccHeadArr);
- }
-
- function getExpNameList(transaction, results) {
-     var i;
-     var jsonExpNameArr = [];
-
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindExpNameHead = new Object();
-
-         jsonFindExpNameHead["ExpenseID"] = row.id;
-         jsonFindExpNameHead["ExpenseName"] = row.expName;
-         jsonExpNameArr.push(jsonFindExpNameHead);
-     }
-     createExpNameDropDown(jsonExpNameArr);
- }
-
- function getCurrencyList(transaction, results) {
-     var i;
-     var jsonCurrencyArr = [];
-
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindCurrHead = new Object();
-         jsonFindCurrHead["Value"] = row.currencyId;
-         jsonFindCurrHead["Label"] = row.currencyName;
-
-         jsonCurrencyArr.push(jsonFindCurrHead);
-     }
-     createCurrencyDropDown(jsonCurrencyArr)
- }
-
- function onloadTravelData() {
-     if (mydb) {
-         mydb.transaction(function(t) {
-             t.executeSql("SELECT * FROM travelModeMst", [], fetchTravelModeList);
-             t.executeSql("SELECT * FROM travelCategoryMst", [], fetchTrvlCategoryList);
-             t.executeSql("SELECT * FROM cityTownMst", [], fetchCityTownList);
-             t.executeSql("SELECT * FROM travelTypeMst", [], fetchTrvlTypeList);
-             t.executeSql("SELECT * FROM travelAccountHeadMst where processId=3", [], getTrAccHeadList);
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function fetchTravelModeList(transaction, results) {
-     var i;
-     var jsonTrvlModeArr = [];
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindMode = new Object();
-         jsonFindMode["Value"] = row.travelModeId;
-         jsonFindMode["Label"] = row.travelModeName;
-
-         jsonTrvlModeArr.push(jsonFindMode);
-     }
-     createTravelModeDown(jsonTrvlModeArr);
- }
-
- function fetchTrvlCategoryList(transaction, results) {
-     var i;
-     var jsonCategoryArr = [];
-
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindCategory = new Object();
-         jsonFindCategory["Value"] = row.travelCategoryId;
-         jsonFindCategory["Label"] = row.travelCategoryName;
-
-         jsonCategoryArr.push(jsonFindCategory);
-     }
-     createCategoryDropDown(jsonCategoryArr);
- }
-
- function fetchCityTownList(transaction, results) {
-     var i;
-     var jsonCityTownArr = [];
-
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindCityTown = new Object();
-         jsonFindCityTown["Value"] = row.cityTownId;
-         jsonFindCityTown["Label"] = row.cityTownName;
-
-         jsonCityTownArr.push(jsonFindCityTown);
-     }
-     createCitytownDropDown(jsonCityTownArr);
- }
-
- function fetchTrvlTypeList(transaction, results) {
-     var i;
-     var jsonTravelTypeArr = [];
-
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindTravelType = new Object();
-         jsonFindTravelType["Value"] = row.travelTypeId;
-         jsonFindTravelType["Label"] = row.travelTypeName;
-
-         jsonTravelTypeArr.push(jsonFindTravelType);
-     }
-     createTravelTypeDropDown(jsonTravelTypeArr)
- }
-
- function resetUserSessionDetails() {
-     window.localStorage.removeItem("TrRole");
-     window.localStorage.removeItem("EmployeeId");
-     window.localStorage.removeItem("FirstName");
-     window.localStorage.removeItem("LastName");
-     window.localStorage.removeItem("GradeID");
-     window.localStorage.removeItem("BudgetingStatus");
-     window.localStorage.removeItem("UnitId");
-     window.localStorage.removeItem("UserName");
-     window.localStorage.removeItem("Password");
-     window.localStorage.removeItem("MobileMapRole");
-     window.localStorage.removeItem("EaInMobile");
-     window.localStorage.removeItem("multiLangInMobile");
-     window.localStorage.removeItem("localLanguage");
-     window.localStorage.removeItem("mobileEC");
-     window.localStorage.removeItem("MapProvider");
-     dropAllTableDetails();
- }
-
- function setUserSessionDetails(val, userJSON) {
-     //alert("buss : "+val.mobileEC);
-     window.localStorage.setItem("TrRole", val.TrRole);
-     window.localStorage.setItem("EmployeeId", val.EmpId);
-     window.localStorage.setItem("FirstName", val.FirstName);
-     window.localStorage.setItem("LastName", val.LastName);
-     window.localStorage.setItem("GradeID", val.GradeID);
-     window.localStorage.setItem("BudgetingStatus", val.BudgetingStatus);
-     window.localStorage.setItem("UnitId", val.UnitId);
-     window.localStorage.setItem("MapProvider", val.MapProvider);
-
-     //For Mobile Google Map Role Start
-     //End
-     if (!val.hasOwnProperty('MobileMapRole')) {
-         window.localStorage.setItem("MobileMapRole", false);
-     } else {
-         window.localStorage.setItem("MobileMapRole", val.MobileMapRole);
-     }
-     //For EA in mobile
-     if (!val.hasOwnProperty('EaInMobile')) {
-         window.localStorage.setItem("EaInMobile", false);
-     } else {
-         window.localStorage.setItem("EaInMobile", val.EaInMobile);
-     }
-     if (!val.hasOwnProperty('smartClaimsViaSMSOnMobile')) {
-         window.localStorage.setItem("smartClaimsViaSMSOnMobile", false);
-     } else {
-         window.localStorage.setItem("smartClaimsViaSMSOnMobile", val.smartClaimsViaSMSOnMobile);
-     }
-     if (!val.hasOwnProperty('multiLangInMobile')) {
-         window.localStorage.setItem("multiLangInMobile", false);
-     } else {
-         window.localStorage.setItem("multiLangInMobile", val.multiLangInMobile);
-     }
-     if (!val.hasOwnProperty('mobileEC')) {
-         window.localStorage.setItem("mobileEC", true);
-     } else {
-         window.localStorage.setItem("mobileEC", val.mobileEC);
-     }
-     /*if(!val.hasOwnProperty('MapProvider')){
-       window.localStorage.setItem("MapProvider","MAPMYINDIA");
-     }else{
-      window.localStorage.setItem("MapProvider",val.MapProvider); 
-     } */
-     //End
-     window.localStorage.setItem("UserName", userJSON["user"]);
-     window.localStorage.setItem("Password", userJSON["pass"]);
-     window.localStorage.setItem("localLanguage", 0);
-
-     //***************************** Profile Image -- Start *******************************************************//
-
-     try {
-         var empId = window.localStorage.getItem("EmployeeId");
-
-         if (mydb) {
-
-                      mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM profileMst");
-                     });
-
-             if (val.ProfileImageData != "" && val.ProfileImageData != null) {
-                 mydb.transaction(function(t) {
-                     t.executeSql("INSERT INTO profileMst (empId,profileAttachment) VALUES (?,?)", [empId, val.ProfileImageData]);
-                 });
-             }
-         } else {
-             alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-         }
-     } catch (e) {
-         console.log(e);
-     }
-
-     //***************************** Profile Image -- End *******************************************************//
-
- }
-
- function setUserStatusInLocalStorage(status) {
-     window.localStorage.setItem("UserStatus", status);
- }
-
- function setUrlPathLocalStorage(url) {
-     window.localStorage.setItem("urlPath", url);
- }
-
- function dropAllTableDetails() {
-
-     mydb.transaction(function(t) {
-
-         t.executeSql("delete from currencyMst");
-         t.executeSql("delete from accountHeadMst");
-         t.executeSql("delete from expNameMst");
-         t.executeSql("delete from businessExpDetails");
-         t.executeSql("delete from walletMst");
-         t.executeSql("delete from travelModeMst");
-         t.executeSql("delete from travelCategoryMst");
-         t.executeSql("delete from cityTownMst");
-         t.executeSql("delete from travelTypeMst");
-         t.executeSql("delete from travelAccountHeadMst");
-         t.executeSql("delete from travelExpenseNameMst");
-         t.executeSql("delete from travelSettleExpDetails");
-         t.executeSql("delete from travelRequestDetails");
-         t.executeSql("delete from accountHeadEAMst");
-         t.executeSql("delete from advanceType");
-         t.executeSql("delete from employeeAdvanceDetails");
-         t.executeSql("delete from currencyConversionMst");
-         t.executeSql("delete from smsMaster");
-         t.executeSql("delete from smsScrutinizerMst");
-         t.executeSql("delete from profileMst");
-         
-
-     });
-
- }
-
- function getUserID() {
-     userKey = window.localStorage.getItem("EmployeeId");
-     if (userKey == null) return "";
-     else return userKey;
- }
-
- function deleteSelectedExpDetails(businessExpDetailId) {
-     mydb.transaction(function(t) {
-         t.executeSql("DELETE FROM businessExpDetails WHERE busExpId=?", [businessExpDetailId]);
-     });
- }
-
- function deleteSelectedTSExpDetails(travelSettleExpDetailId) {
-     mydb.transaction(function(t) {
-         t.executeSql("DELETE FROM travelSettleExpDetails WHERE tsExpId=?", [travelSettleExpDetailId]);
-     });
- }
-
- function fetchWalletImage() {
-     var rowsWallet;
-     mytable = j('<table></table>').attr({
-         id: "walletSource",
-         class: ["table", "table-striped", "table-bordered-wallet"].join(' ')
-     });
-
-     mydb.transaction(function(t) {
-
-         t.executeSql('SELECT * FROM walletMst;', [],
-             function(transaction, result) {
-
-                 if (result != null && result.rows != null) {
-
-                     for (var i = 0; i < result.rows.length; i++) {
-
-                         var row = result.rows.item(i);
-
-                         if (i % 2 == 0) {
-                             rowsWallet = j('<tr></tr>').attr({
-                                 class: ["test"].join(' ')
-                             }).appendTo(mytable);
-                         }
-
-                         //alert("row.walletAttachment : " + row.walletAttachment + "  row.walletId: " +row.walletId+ "  row.walletAttachment: " +row.walletAttachment);
-                         j('<td></td>').attr({
-                             class: ["walletattach"].join(' ')
-                         }).html('<text style="display: none">' + row.walletAttachment + '</text>' + '<p id="para" style="display: none">' + row.walletId + '</p>' + '<img src="' + row.walletAttachment + '">').appendTo(rowsWallet);
-
-                     }
-                     j("#walletSource td").click(function() {
-                         headerOprationBtn = defaultPagePath + 'headerPageForWalletOperation.html';
-                         if (j(this).hasClass("selected")) {
-                             j(this).removeClass('selected');
-                             j('#mainHeader').load(headerOprationBtn);
-                         } else {
-                             j('#mainHeader').load(headerOprationBtn);
-                             j(this).addClass('selected');
-                         }
-                     });
-                 }
-             });
-     });
-     mytable.appendTo("#walletBox");
- }
-
- function deleteSelectedWallets(walletID) {
-     mydb.transaction(function(t) {
-         t.executeSql("DELETE FROM walletMst WHERE walletId=?", [walletID]);
-     });
- }
-
- function saveWalletAttachment(status) {
-     j('#loading_Cat').show();
-     try {
-         if (mydb) {
-             //get the values of the text inputs
-
-             //var file = document.getElementById('imageWallet').files[0];
-             var file = document.getElementById("imageWallet").src;
-
-             if (file != "") {
-                 mydb.transaction(function(t) {
-                     t.executeSql("INSERT INTO walletMst (walletAttachment) VALUES (?)", [file]);
-                     if (status == "0") {
-                         document.getElementById('imageWallet').value = "";
-                         createWallet();
-                     } else {
-                         createWallet();
-                     }
-                 });
-                 j('#loading_Cat').hide();
-             } else {
-                 j('#loading_Cat').hide();
-                 alert(window.lang.translate('You must enter inputs!'));
-             }
-         } else {
-             alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-         }
-     } catch (e) {
-         alert("Exception in saveWalletAttachment : " + e);
-     }
- }
-
- function getExpenseNamesfromDB(accountHeadId) {
-     j('#errorMsgArea').children('span').text("");
-     if (mydb) {
-         //Get all the employeeDetails from the database with a select statement, set outputEmployeeDetails as the callback function for the executeSql command
-         mydb.transaction(function(t) {
-             t.executeSql("SELECT * FROM expNameMst where accHeadId=" + accountHeadId, [], getExpNameList);
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function getExpenseNamesfromDBTravel(travelRequestId) {
-     if (mydb) {
-         //Get all the employeeDetails from the database with a select statement, set outputEmployeeDetails as the callback function for the executeSql command
-         mydb.transaction(function(t) {
-             t.executeSql("SELECT * FROM travelExpenseNameMst where accHeadId=(select accountHeadId from travelRequestDetails where travelRequestId=" + travelRequestId + ")", [], fetchTravelExpeseName);
-             //t.executeSql("SELECT * FROM travelExpenseNameMst where travelAccountHeadId="+accountHeadId, [],fetchTravelExpeseName);
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function getStartEndDatefromDBTravel(travelRequestId) {
-     if (mydb) {
-         //Get all the employeeDetails from the database with a select statement, set outputEmployeeDetails as the callback function for the executeSql command
-         mydb.transaction(function(t) {
-             var result = t.executeSql("select travelStartDate,travelEndDate from travelRequestDetails where travelRequestId=" + travelRequestId, [], fetchTravelStartEndDate);
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function getCurrencyDBTravel(travelRequestId) {
-     if (mydb) {
-         //Get all the employeeDetails from the database with a select statement, set outputEmployeeDetails as the callback function for the executeSql command
-         mydb.transaction(function(t) {
-             t.executeSql("select travelDomOrInter from travelRequestDetails where travelRequestId=" + travelRequestId, [], fetchTravelDomOrInterDate);
-
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function onloadTravelSettleData() {
-     if (mydb) {
-         mydb.transaction(function(t) {
-             t.executeSql("SELECT * FROM travelModeMst", [], fetchTravelModeList);
-             t.executeSql("SELECT * FROM travelCategoryMst", [], fetchTrvlCategoryList);
-             t.executeSql("SELECT * FROM cityTownMst", [], fetchCityTownList);
-             t.executeSql("SELECT * FROM travelRequestDetails", [], fetchTravelRequestNumberList);
-             t.executeSql("SELECT * FROM travelExpenseNameMst", [], fetchTravelExpeseName);
-             t.executeSql("SELECT * FROM currencyMst", [], getCurrencyList);
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function fetchTravelExpeseName(transaction, results) {
-     var i;
-     var jsonExpenseNameArr = [];
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindTravelType = new Object();
-         jsonFindTravelType["ExpenseNameId"] = row.id;
-         jsonFindTravelType["ExpenseName"] = row.expenseName;
-         jsonExpenseNameArr.push(jsonFindTravelType);
-     }
-     createTravelExpenseNameDropDown(jsonExpenseNameArr)
- }
-
- function fetchTravelStartEndDate(transaction, results) {
-     var monthVal = ""
-     var i;
-     var jsonExpenseNameArr = [];
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-
-     }
-     $(function() {
-         var startDate = row.travelStartDate;
-         j("label[for='startDate']").html(startDate);
-         var endDate = row.travelEndDate;
-         j("label[for='endDate']").html(endDate);
-         var startdate_day = startDate.substring(0, 2);
-         var startdate_month = convertDate(startDate.substring(3, 6));
-         var startdate_year = startDate.substring(7, 11);
-         var endDate_day = endDate.substring(0, 2);
-         var endDate_month = convertDate(endDate.substring(3, 6));
-         var endDate_year = endDate.substring(7, 11);
-         var date = new Date();
-         var currentMonth = date.getMonth();
-         var currentDate = date.getDate();
-         var currentYear = date.getFullYear();
-
-         $('#expDate').datepicker({
-             maxDate: new Date(endDate_year, endDate_month, endDate_day),
-             minDate: new Date(startdate_year, startdate_month, startdate_day)
-         });
-     });
- }
-
- function fetchTravelDomOrInterDate(transaction, results) {
-     var monthVal = ""
-     var i;
-     var jsonExpenseNameArr = [];
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var DomOrInter = row.travelDomOrInter;
-         if (DomOrInter == 'D') {
-             j('#currency').select2('disable');
-         } else {
-             j('#currency').select2('enable');
-             if (mydb) {
-                 mydb.transaction(function(t) {
-                     t.executeSql("SELECT * FROM currencyMst", [], getCurrencyList);
-                 });
-             } else {
-                 alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-             }
-         }
-     }
-
- }
-
- function getPerUnitFromDB(expenseNameID) {
-     j('#errorMsgArea').children('span').text("");
-     if (mydb) {
-         //Get all the employeeDetails from the database with a select statement, set outputEmployeeDetails as the callback function for the executeSql command
-         mydb.transaction(function(t) {
-             t.executeSql("SELECT * FROM expNameMst where id=" + expenseNameID, [], setPerUnitDetails);
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function getModecategoryFromDB(expenseNameID) {
-     if (mydb) {
-         //Get all the employeeDetails from the database with a select statement, set outputEmployeeDetails as the callback function for the executeSql command
-         mydb.transaction(function(t) {
-             t.executeSql("SELECT * FROM travelExpenseNameMst where id=" + expenseNameID, [], setModeCategroyDetails);
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function getCategoryFromDB(modeID) {
-     if (mydb) {
-         //Get all the employeeDetails from the database with a select statement, set outputEmployeeDetails as the callback function for the executeSql command
-         mydb.transaction(function(t) {
-             t.executeSql("SELECT * FROM travelCategoryMst where travelModeId=" + modeID, [], fetchTrvlCategoryList);
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function synchronizeTRForTS() {
-     var jsonSentToSync = new Object();
-     jsonSentToSync["EmployeeId"] = window.localStorage.getItem("EmployeeId");
-     j('#loading_Cat').show();
-     if (mydb) {
-         j.ajax({
-             url: window.localStorage.getItem("urlPath") + "FetchTRForTSWebService",
-             type: 'POST',
-             dataType: 'json',
-             crossDomain: true,
-             data: JSON.stringify(jsonSentToSync),
-             success: function(data) {
-                 if (data.Status == 'Success') {
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM travelRequestDetails");
-                         var travelRequestArray = data.TravelReqJSONArray;
-                         if (travelRequestArray != null && travelRequestArray.length > 0) {
-                             for (var i = 0; i < travelRequestArray.length; i++) {
-                                 var stateArr = new Array();
-                                 stateArr = travelRequestArray[i];
-                                 var travel_request_id = stateArr.TravelRequestId;
-                                 var travel_request_no = stateArr.TravelRequestNo;
-                                 var title = stateArr.Title;
-                                 var ac_head_id = stateArr.AcHeadId;
-                                 var tr_end_date = stateArr.TravelEndDate;
-                                 var tr_start_date = stateArr.TravelStartDate;
-                                 var tr_DomOrInter = stateArr.TravelDoMOrInter;
-                                 var adv_Requested = stateArr.AdvanceRequested;
-                                 var adv_Requested_Amount = stateArr.AdvanceAmount;
-
-                                 t.executeSql("INSERT INTO travelRequestDetails (travelRequestId,travelRequestNo,title,accountHeadId,travelEndDate,travelStartDate,travelDomOrInter,advanceRequested,advanceAmount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [travel_request_id, travel_request_no, title, ac_head_id, tr_end_date, tr_start_date, tr_DomOrInter, adv_Requested, adv_Requested_Amount]);
-
-                             }
-                         }
-                     });
-                     onloadTravelSettleData();
-                     j('#loading_Cat').hide();
-
-                     document.getElementById("syncSuccessMsg").innerHTML = "Travel Request Details synchronized successfully.";
-                     j('#syncSuccessMsg').hide().fadeIn('slow').delay(500).fadeOut('slow');
-                 } else {
-                     j('#loading_Cat').hide();
-                     document.getElementById("syncFailureMsg").innerHTML = "Travel Required Expenses not synchronized successfully.";
-                     j('#syncFailureMsg').hide().fadeIn('slow').delay(300).fadeOut('slow');
-                 }
-
-             },
-             error: function(data) {
-                 alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-             }
-         });
-
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function fetchTravelRequestNumberList(transaction, results) {
-
-     var i;
-     var jsonExpenseNameArr = [];
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindTravelType = new Object();
-         jsonFindTravelType["TravelRequestId"] = row.travelRequestId;
-         jsonFindTravelType["Title"] = row.title;
-         jsonFindTravelType["TravelRequestNumber"] = row.travelRequestNo;
-         jsonExpenseNameArr.push(jsonFindTravelType);
-
-     }
-     createTravelRequestNoDropDown(jsonExpenseNameArr)
- }
-
- function forceCloseDropdown() {
-     j('#accountHead').select2('close');
-     j('#expenseName').select2('close');
-     j('#currency').select2('close');
-     j('#travelType').select2('close');
-     j('#fromCitytown').select2('close');
-     j('#toCitytown').select2('close');
-     j('#travelMode').select2('close');
-     j('#travelCategory').select2('close');
-     j('#roundTripMode').select2('close');
-     j('#roundTripCategory').select2('close');
-     j('#travelRequestName').select2('close');
-     j('#travelExpenseName').select2('close');
- }
-
- function showHelpMenu() {
-     var headerBackBtn = defaultPagePath + 'backbtnPage.html';
-     // var pageRef=defaultPagePath+'helpMenuPage.html';
-     var pageRef = defaultPagePath + 'underConstruction.html';
-     j(document).ready(function() {
-         j('#mainHeader').load(headerBackBtn);
-         j('#mainContainer').load(pageRef);
-     });
-     appPageHistory.push(pageRef);
- }
-
- function showBEBRBHelp() {
-     var headerBackBtn = defaultPagePath + 'backbtnPage.html';
-     var pageRef = defaultPagePath + 'helpBEBRPage.html';
-     j(document).ready(function() {
-         j('#mainHeader').load(headerBackBtn);
-         j('#mainContainer').load(pageRef);
-     });
-     appPageHistory.push(pageRef);
- }
-
- function showTRTSHelp() {
-     var headerBackBtn = defaultPagePath + 'backbtnPage.html';
-     var pageRef = defaultPagePath + 'helpTRTSPage.html';
-     j(document).ready(function() {
-         j('#mainHeader').load(headerBackBtn);
-         j('#mainContainer').load(pageRef);
-     });
-     appPageHistory.push(pageRef);
- }
-
- function showWalletHelp() {
-     var headerBackBtn = defaultPagePath + 'backbtnPage.html';
-     var pageRef = defaultPagePath + 'helpWalletPage.html';
-     j(document).ready(function() {
-         j('#mainHeader').load(headerBackBtn);
-         j('#mainContainer').load(pageRef);
-     });
-     appPageHistory.push(pageRef);
- }
-
- //applib.js   changes by Dinesh
-
- function synchronizeEAMasterData() {
-     var jsonSentToSync = new Object();
-     jsonSentToSync["BudgetingStatus"] = window.localStorage.getItem("BudgetingStatus");
-     jsonSentToSync["EmployeeId"] = window.localStorage.getItem("EmployeeId");
-     jsonSentToSync["GradeId"] = window.localStorage.getItem("GradeID");
-     jsonSentToSync["UnitId"] = window.localStorage.getItem("UnitId");
-     j('#loading_Cat').show();
-     if (mydb) {
-         j.ajax({
-             url: window.localStorage.getItem("urlPath") + "SyncAccountHeadEAWebService",
-             type: 'POST',
-             dataType: 'json',
-             crossDomain: true,
-             data: JSON.stringify(jsonSentToSync),
-             success: function(data) {
-                 if (data.Status == 'Success') {
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM accountHeadEAMst");
-                         var accountHeadArray = data.AccountHeadArray;
-                         if (accountHeadArray != null && accountHeadArray.length > 0) {
-                             for (var i = 0; i < accountHeadArray.length; i++) {
-                                 var stateArr = new Array();
-                                 stateArr = accountHeadArray[i];
-                                 var acc_head_id = stateArr.Value;
-                                 var acc_head_name = stateArr.Label;
-                                 t.executeSql("INSERT INTO accountHeadEAMst (accountHeadId,accHeadName) VALUES (?, ?)", [acc_head_id, acc_head_name]);
-
-                             }
-                         }
-                     });
-
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM advanceType");
-                         var advanceTypeArray = data.AdvanceTypeArray;
-                         if (advanceTypeArray != null && advanceTypeArray.length > 0) {
-                             for (var i = 0; i < advanceTypeArray.length; i++) {
-                                 var stateArr = new Array();
-                                 stateArr = advanceTypeArray[i];
-                                 var advTypeId = stateArr.Value;
-                                 var advTypeName = stateArr.Label;
-
-                                 t.executeSql("INSERT INTO advanceType (advancetypeID,advancetype) VALUES ( ?, ?)", [advTypeId, advTypeName]);
-                             }
-                         }
-                     });
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM employeeAdvanceDetails");
-                         var empAdvArray = data.EmpAdvArray;
-                         if (empAdvArray != null && empAdvArray.length > 0) {
-                             for (var i = 0; i < empAdvArray.length; i++) {
-                                 var stateArr = new Array();
-                                 stateArr = empAdvArray[i];
-                                 var empAdvId = stateArr.Value;
-                                 var empAdvVoucherNo = stateArr.EmpAdvaucherNo;
-                                 var empAdvTitle = stateArr.VoucherTitle;
-                                 var empAdvAmount = stateArr.Amount;
-
-                                 t.executeSql("INSERT INTO employeeAdvanceDetails (empAdvID,emplAdvVoucherNo,empAdvTitle,Amount) VALUES ( ?, ?, ?, ?)", [empAdvId, empAdvVoucherNo, empAdvTitle, empAdvAmount]);
-                             }
-                         }
-                     });
-                     window.localStorage.setItem("EmpAdvDate", data.EmpAdvDate);
-                     window.localStorage.setItem("DefaultAdvType", data.DefaultAdvType);
-                     window.localStorage.setItem("DefaultAccontHead", data.DefaultAccontHead);
-                     window.localStorage.setItem("DefaultCurrencyName", data.DefaultCurrencyName);
-
-                     j('#loading_Cat').hide();
-
-                     document.getElementById("syncSuccessMsg").innerHTML = "Employee Advance synchronized successfully.";
-                     j('#syncSuccessMsg').hide().fadeIn('slow').delay(800).fadeOut('slow');
-
-                 } else {
-                     j('#loading_Cat').hide();
-                     document.getElementById("syncFailureMsg").innerHTML = "Employee Advance not synchronized successfully.";
-                     j('#syncFailureMsg').hide().fadeIn('slow').delay(300).fadeOut('slow');
-
-                 }
-
-             },
-             error: function(data) {
-                 alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-             }
-         });
-     }
- }
-
- //applib.js   changes by Dinesh end
-
- //amit applib.js changes start
- function onloadEAData() {
-     var EmpAdvDate = window.localStorage.getItem("EmpAdvDate");
-     document.getElementById("empAdvDate").value = EmpAdvDate;
-
-     if (mydb) {
-         mydb.transaction(function(t) {
-             t.executeSql("SELECT * FROM advanceType", [], fetchAdvanceTypeList);
-             t.executeSql("SELECT * FROM accountHeadEAMst", [], fetchAccountHeadList);
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function fetchAdvanceTypeList(transaction, results) {
-     var i;
-     var jsonAdvanceTypeArr = [];
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindAdvanceType = new Object();
-         jsonFindAdvanceType["Value"] = row.advancetypeID;
-         jsonFindAdvanceType["Label"] = row.advancetype;
-
-         jsonAdvanceTypeArr.push(jsonFindAdvanceType);
-     }
-     createAdvanceTypeDropDown(jsonAdvanceTypeArr)
- }
-
- function getAdvanceTypeFromDB(AdvancetypeID) {
-     if (mydb) {
-         //Get all the employeeDetails from the database with a select statement, set outputEmployeeDetails as the callback function for the executeSql command
-         mydb.transaction(function(t) {
-             t.executeSql("SELECT * FROM advanceType where advancetypeID=" + AdvancetypeID, [], fetchAdvanceTypeList);
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function fetchAccountHeadList(transaction, results) {
-     var i;
-     var jsonAccountHeadArr = [];
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindAccountHead = new Object();
-         jsonFindAccountHead["Value"] = row.accountHeadId;
-         jsonFindAccountHead["Label"] = row.accHeadName;
-
-         jsonAccountHeadArr.push(jsonFindAccountHead);
-     }
-     createAccountHeadDropDown(jsonAccountHeadArr)
- }
-
- function getAccountHeadFromDB(AccountHeadID) {
-     if (mydb) {
-         mydb.transaction(function(t) {
-             t.executeSql("SELECT * FROM accountHeadEAMst where accountHeadId=" + AccountHeadID, [], fetchAccountHeadList);
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function populateEATitle() {
-
-     var EmpAdvDate = document.getElementById("empAdvDate").value;
-     var EmpAdvType = j("#empAdvType").select2('data').name;
-
-     document.getElementById("empAdvTitle").value = EmpAdvType + '/' + EmpAdvDate;
-
- }
-
- function fetchEmployeeAdvance() {
-
-     mytable = j('<table></table>').attr({
-         id: "source",
-         class: ["table", "table-striped", "table-bordered"].join(' ')
-     });
-     var rowThead = j("<thead></thead>").appendTo(mytable);
-     var rowTh = j('<tr></tr>').attr({
-         class: ["test"].join(' ')
-     }).appendTo(rowThead);
-
-     j('<th lang=\'en\'></th>').text("Date").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Expense Name").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Narration From/To Loc").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Amt").appendTo(rowTh);
-     var cols = new Number(5);
-
-     mydb.transaction(function(t) {
-         var headerOprationBtn;
-         t.executeSql('SELECT * FROM businessExpDetails INNER JOIN expNameMst ON businessExpDetails.expNameId =expNameMst.id INNER JOIN currencyMst ON businessExpDetails.currencyId =currencyMst.currencyId  INNER JOIN currencyConversionMst ON businessExpDetails.currencyId = currencyConversionMst.currencyId INNER JOIN accountHeadMst ON businessExpDetails.accHeadId =accountHeadMst.accountHeadId;', [],
-             function(transaction, result) {
-                 if (result != null && result.rows != null) {
-
-                     for (var i = 0; i < result.rows.length; i++) {
-
-                         var row = result.rows.item(i);
-                         var shrinkFromTo;
-                         var newDateFormat = reverseConvertDate(row.expDate.substring(0, 2)) + "-" + row.expDate.substring(3, 5) + " " + row.expDate.substring(6, 10);
-
-                         if (window.localStorage.getItem("MobileMapRole") == 'true') {
-                             if (row.expFromLoc != '' && row.expToLoc != '') {
-                                 var shrinkNarration = row.expNarration.substring(0, row.expNarration.indexOf("--"))
-                                 srinckFromTo = row.expFromLoc.substring(0, row.expFromLoc.indexOf(",")) + "/" + row.expToLoc.substring(0, row.expToLoc.indexOf(","));
-                                 srinckFromTo = srinckFromTo.concat("...");
-                             }
-                         }
-
-                         var rowss = j('<tr></tr>').attr({
-                             class: ["test"].join(' ')
-                         }).appendTo(mytable);
-                         j('<td></td>').attr({
-                             class: ["expDate"].join(' ')
-                         }).html('<p style="color: black;">' + newDateFormat + '</P>').appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expName"].join(' ')
-                         }).html('<p style="color: black;">' + row.expName + '</P>').appendTo(rowss).appendTo(rowss);
-                         if (window.localStorage.getItem("MobileMapRole") == 'true') {
-                             if (row.expFromLoc != '' && row.expToLoc != '') {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p style="color: black;">' + shrinkNarration + '</br>' + srinckFromTo + '</P>').appendTo(rowss);
-                             } else {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p style="color: black;">' + row.expNarration + '</br>' + row.expFromLoc + "" + row.expToLoc + '</P>').appendTo(rowss);
-                             }
-                         } else {
-                             if (row.expFromLoc != '' && row.expToLoc != '') {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p style="color: black;">' + row.expNarration + '</br>' + row.expFromLoc + "/" + row.expToLoc + '</P>').appendTo(rowss);
-                             } else {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p style="color: black;">' + row.expNarration + '</br>' + row.expFromLoc + "" + row.expToLoc + '</P>').appendTo(rowss);
-                             }
-
-                         }
-
-                         if (row.busExpAttachment.length == 0) {
-                             j('<td></td>').attr({
-                                 class: ["expAmt"].join(' ')
-                             }).html('<p style="color: black;">' + row.expAmt + ' ' + row.currencyName + '</P>').appendTo(rowss);
-                         } else {
-                             j('<td></td>').attr({
-                                 class: ["expAmt"].join(' ')
-                             }).html('<p style="color: black;">' + row.expAmt + ' ' + row.currencyName + '</P><img src="images/attach.png" width="25px" height="25px">').appendTo(rowss);
-                         }
-                         j('<td></td>').attr({
-                             class: ["expDate1", "displayNone"].join(' ')
-                         }).text(row.expDate).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expFromLoc1", "displayNone"].join(' ')
-                         }).text(row.expFromLoc).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expToLoc1", "displayNone"].join(' ')
-                         }).text(row.expToLoc).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expNarration1", "displayNone"].join(' ')
-                         }).text(row.expNarration).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expAmt1", "displayNone"].join(' ')
-                         }).text(row.expAmt).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["busAttachment", "displayNone"].join(' ')
-                         }).text(row.busExpAttachment).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["accHeadId", "displayNone"].join(' ')
-                         }).text(row.accHeadId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expNameId", "displayNone"].join(' ')
-                         }).text(row.expNameMstId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expUnit", "displayNone"].join(' ')
-                         }).text(row.expUnit).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["currencyId", "displayNone"].join(' ')
-                         }).text(row.currencyId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["conversionRate", "displayNone"].join(' ')
-                         }).text(row.conversionRate).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["accountCodeId", "displayNone"].join(' ')
-                         }).text(row.accCodeId).appendTo(rowss);
-                         //j('<td></td>').attr({ class: ["expName","displayNone"].join(' ') }).text(row.expName).appendTo(rowss);       
-                         j('<td></td>').attr({
-                             class: ["busExpId", "displayNone"].join(' ')
-                         }).text(row.busExpId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isErReqd", "displayNone"].join(' ')
-                         }).text(row.isErReqd).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["ERLimitAmt", "displayNone"].join(' ')
-                         }).text(row.limitAmountForER).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isEntitlementExceeded", "displayNone"].join(' ')
-                         }).text(row.isEntitlementExceeded).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["wayPoint", "displayNone"].join(' ')
-                         }).text(row.wayPointunitValue).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isAttachmentReq", "displayNone"].join(' ')
-                         }).text(row.isAttachmentReq).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isEntiLineOrVoucherLevel", "displayNone"].join(' ')
-                         }).text(row.isEntiLineOrVoucherLevel).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expFixedLimitAmt", "displayNone"].join(' ')
-                         }).text(row.expFixedLimitAmt).appendTo(rowss);
-                     }
-
-                     j("#source tr").click(function() {
-                         headerOprationBtn = defaultPagePath + 'headerPageForBEOperation.html';
-                         if (j(this).hasClass("selected")) {;
-                             var headerBackBtn = defaultPagePath + 'headerPageForBEOperation.html';
-                             j(this).removeClass('selected');
-                             populateBEAmount();
-                             j('#mainHeader').load(headerBackBtn);
-                         } else {
-                             if (j(this).text() == 'DateExpense NameNarration From/To LocAmt') {
-
-                             } else {
-                                 j('#mainHeader').load(headerOprationBtn);
-                                 j(this).addClass('selected');
-                                 populateBEAmount();
-                             }
-                         }
-                     });
-                 }
-             });
-     });
-     mytable.appendTo("#box");
-
-     mainTable = j('<table></table>').attr({
-         class: ["table", "table-striped", "table-bordered"].join(' ')
-     });
-     table1 = j('<table></table>').attr({
-         class: ["table", "table1", "table-striped", "table-bordered"].join(' ')
-     }).appendTo(mainTable);
-     var rowThead = j("<thead></thead>").appendTo(table1);
-     var rowTh = j('<tr></tr>').attr({
-         class: ["test"].join(' ')
-     }).appendTo(rowThead);
-
-     j('<th lang=\'en\'></th>').text("Voucher No.").appendTo(rowTh);
-     //j('<th></th>').text("Title").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Amount").appendTo(rowTh);
-
-     table2 = j('<table></table>').attr({
-         id: "source1",
-         class: ["table", "table-striped", "table-bordered"].join(' ')
-     }).appendTo(mainTable);
-     var rowThead1 = j("<thead></thead>").appendTo(table2);
-     mydb.transaction(function(t) {
-         var headerOprationBtn;
-         t.executeSql('SELECT * FROM employeeAdvanceDetails;', [],
-             function(transaction, result) {
-                 if (result != null && result.rows != null) {
-
-                     for (var i = 0; i < result.rows.length; i++) {
-
-                         var row = result.rows.item(i);
-
-                         var rowss = j('<tr></tr>').attr({
-                             class: ["test"].join(' ')
-                         }).appendTo(rowThead1);
-
-                         j('<td></td>').attr({
-                             class: ["empAdvID", "displayNone"].join(' ')
-                         }).text(row.empAdvID).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["emplAdvVoucherNo"].join(' ')
-                         }).text(row.emplAdvVoucherNo).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["empAdvTitle", "displayNone"].join(' ')
-                         }).text(row.empAdvTitle).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["Amount"].join(' ')
-                         }).text(row.Amount).appendTo(rowss);
-                     }
-                     $("#header tr").click(function() {
-                         $("tr").attr('onclick', '');
-                     });
-
-                     j("#source1 tr").click(function() {
-                         if (j(this).hasClass("selected")) {
-                             j(this).removeClass('selected');
-                             populateEAAmount();
-                             calculateAmount();
-                         } else {
-                             j(this).addClass('selected');
-                             populateEAAmount();
-                             calculateAmount();
-                         }
-                     });
-                 }
-             });
-     });
-     mainTable.appendTo("#box1");
-     var header = defaultPagePath + 'backbtnPage.html';
-     j('#mainHeader').load(header);
- }
-
- function deleteSelectedEmplAdv(employeeAdvDetailId) {
-     mydb.transaction(function(t) {
-         t.executeSql("DELETE FROM employeeAdvanceDetails WHERE empAdvID=?", [employeeAdvDetailId]);
-     });
- }
-
- function showSyncMaster() {
-     var headerBackBtn = defaultPagePath + 'backbtnPage.html';
-     var pageRef = defaultPagePath + 'syncMaster.html';
-     j(document).ready(function() {
-         j('#mainHeader').load(headerBackBtn);
-         j('#mainContainer').load(pageRef);
-     });
-     appPageHistory.push(pageRef);
- }
-
- function fetchBusinessExpNdEmployeeAdv() {
-     j('#source').remove();
-     mytable = j('<table></table>').attr({
-         id: "source",
-         class: ["table", "table-striped", "table-bordered"].join(' ')
-     });
-     var rowThead = j("<thead></thead>").appendTo(mytable);
-     var rowTh = j('<tr></tr>').attr({
-         class: ["test"].join(' ')
-     }).appendTo(rowThead);
-
-     j('<th lang=\'en\'></th>').text("Date").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Expense Name").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Narration From/To Loc").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Amt").appendTo(rowTh);
-     var cols = new Number(5);
-
-     mydb.transaction(function(t) {
-         var headerOprationBtn;
-         t.executeSql('SELECT * FROM businessExpDetails INNER JOIN expNameMst ON businessExpDetails.expNameId =expNameMst.id INNER JOIN currencyMst ON businessExpDetails.currencyId =currencyMst.currencyId  INNER JOIN currencyConversionMst ON businessExpDetails.currencyId = currencyConversionMst.currencyId INNER JOIN accountHeadMst ON businessExpDetails.accHeadId =accountHeadMst.accountHeadId;', [],
-             function(transaction, result) {
-                 if (result != null && result.rows != null) {
-
-                     for (var i = 0; i < result.rows.length; i++) {
-
-                         var row = result.rows.item(i);
-                         var shrinkFromTo;
-                         var newDateFormat = reverseConvertDate(row.expDate.substring(0, 2)) + "-" + row.expDate.substring(3, 5) + " " + row.expDate.substring(6, 10);
-
-                         if (window.localStorage.getItem("MobileMapRole") == 'true') {
-                             if (row.expFromLoc != '' && row.expToLoc != '') {
-                                 var shrinkNarration = row.expNarration.substring(0, row.expNarration.indexOf("--"))
-                                 srinckFromTo = row.expFromLoc.substring(0, row.expFromLoc.indexOf(",")) + "/" + row.expToLoc.substring(0, row.expToLoc.indexOf(","));
-                                 srinckFromTo = srinckFromTo.concat("...");
-                             }
-                         }
-
-                         var rowss = j('<tr></tr>').attr({
-                             class: ["test"].join(' ')
-                         }).appendTo(mytable);
-                         j('<td></td>').attr({
-                             class: ["expDate"].join(' ')
-                         }).html('<p style="color: black;">' + newDateFormat + '</P>').appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expName"].join(' ')
-                         }).html('<p style="color: black;">' + row.expName + '</P>').appendTo(rowss).appendTo(rowss);
-
-                         if (window.localStorage.getItem("MobileMapRole") == 'true') {
-                             if (row.expFromLoc != '' && row.expToLoc != '') {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p>' + shrinkNarration + '</br>' + srinckFromTo + '</P>').appendTo(rowss);
-                             } else {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p>' + row.expNarration + '</br>' + row.expFromLoc + "" + row.expToLoc + '</P>').appendTo(rowss);
-                             }
-                         } else {
-                             if (row.expFromLoc != '' && row.expToLoc != '') {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p style="color: black;">' + row.expNarration + '</br>' + row.expFromLoc + "/" + row.expToLoc + '</P>').appendTo(rowss);
-                             } else {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p style="color: black;">' + row.expNarration + '</br>' + row.expFromLoc + "" + row.expToLoc + '</P>').appendTo(rowss);
-                             }
-                         }
-
-                         if (row.busExpAttachment.length == 0) {
-                             j('<td></td>').attr({
-                                 class: ["expAmt"].join(' ')
-                             }).html('<p>' + row.expAmt + ' ' + row.currencyName + '</P>').appendTo(rowss);
-                         } else {
-                             j('<td></td>').attr({
-                                 class: ["expAmt"].join(' ')
-                             }).html('<p>' + row.expAmt + ' ' + row.currencyName + '</P><img src="images/attach.png" width="25px" height="25px">').appendTo(rowss);
-                         }
-                         j('<td></td>').attr({
-                             class: ["expDate1", "displayNone"].join(' ')
-                         }).text(row.expDate).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expFromLoc1", "displayNone"].join(' ')
-                         }).text(row.expFromLoc).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expToLoc1", "displayNone"].join(' ')
-                         }).text(row.expToLoc).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expNarration1", "displayNone"].join(' ')
-                         }).text(row.expNarration).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expAmt1", "displayNone"].join(' ')
-                         }).text(row.expAmt).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["busAttachment", "displayNone"].join(' ')
-                         }).text(row.busExpAttachment).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["accHeadId", "displayNone"].join(' ')
-                         }).text(row.accHeadId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expNameId", "displayNone"].join(' ')
-                         }).text(row.expNameMstId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expUnit", "displayNone"].join(' ')
-                         }).text(row.expUnit).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["currencyId", "displayNone"].join(' ')
-                         }).text(row.currencyId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["conversionRate", "displayNone"].join(' ')
-                         }).text(row.conversionRate).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["accountCodeId", "displayNone"].join(' ')
-                         }).text(row.accCodeId).appendTo(rowss);
-                         //j('<td></td>').attr({ class: ["expName","displayNone"].join(' ') }).text(row.expName).appendTo(rowss);       
-                         j('<td></td>').attr({
-                             class: ["busExpId", "displayNone"].join(' ')
-                         }).text(row.busExpId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isErReqd", "displayNone"].join(' ')
-                         }).text(row.isErReqd).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["ERLimitAmt", "displayNone"].join(' ')
-                         }).text(row.limitAmountForER).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isEntitlementExceeded", "displayNone"].join(' ')
-                         }).text(row.isEntitlementExceeded).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["wayPoint", "displayNone"].join(' ')
-                         }).text(row.wayPointunitValue).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isAttachmentReq", "displayNone"].join(' ')
-                         }).text(row.isAttachmentReq).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isEntiLineOrVoucherLevel", "displayNone"].join(' ')
-                         }).text(row.isEntiLineOrVoucherLevel).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expFixedLimitAmt", "displayNone"].join(' ')
-                         }).text(row.expFixedLimitAmt).appendTo(rowss);
-                     }
-
-                     j("#source tr").click(function() {
-                         headerOprationBtn = defaultPagePath + 'headerPageForBEOperation.html';
-                         if (j(this).hasClass("selected")) {
-                             j(this).removeClass('selected');
-                             populateBEAmount();
-                             j('#mainHeader').load(headerOprationBtn);
-                         } else {
-                             if (j(this).text() == 'DateExpense NameNarration From/To LocAmt') {
-
-                             } else {
-                                 j(this).addClass('selected');
-                                 populateBEAmount();
-                                 j('#mainHeader').load(headerOprationBtn);
-                             }
-                         }
-                     });
-                 }
-             });
-     });
-     mytable.appendTo("#box");
-     j('#abc').remove();
-     mainTable = j('<table></table>').attr({
-         id: "abc",
-         class: ["table", "table-striped", "table-bordered"].join(' ')
-     });
-     table1 = j('<table></table>').attr({
-         class: ["table", "table1", "table-striped", "table-bordered"].join(' ')
-     }).appendTo(mainTable);
-     var rowThead = j("<thead></thead>").appendTo(table1);
-     var rowTh = j('<tr></tr>').attr({
-         class: ["test"].join(' ')
-     }).appendTo(rowThead);
-
-     j('<th lang=\'en\' ></th>').text("Voucher No.").appendTo(rowTh);
-     //j('<th></th>').text("Title").appendTo(rowTh);
-     j('<th lang=\'en\' ></th>').text("Amount").appendTo(rowTh);
-
-     table2 = j('<table></table>').attr({
-         id: "source1",
-         class: ["table", "table-striped", "table-bordered"].join(' ')
-     }).appendTo(mainTable);
-     var rowThead1 = j("<thead></thead>").appendTo(table2);
-     mydb.transaction(function(t) {
-         var headerOprationBtn;
-         t.executeSql('SELECT * FROM employeeAdvanceDetails;', [],
-             function(transaction, result) {
-                 if (result != null && result.rows != null) {
-
-                     for (var i = 0; i < result.rows.length; i++) {
-
-                         var row = result.rows.item(i);
-
-                         var rowss = j('<tr></tr>').attr({
-                             class: ["test"].join(' ')
-                         }).appendTo(rowThead1);
-
-                         j('<td></td>').attr({
-                             class: ["empAdvID", "displayNone"].join(' ')
-                         }).text(row.empAdvID).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["emplAdvVoucherNo"].join(' ')
-                         }).text(row.emplAdvVoucherNo).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["empAdvTitle", "displayNone"].join(' ')
-                         }).text(row.empAdvTitle).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["Amount"].join(' ')
-                         }).text(row.Amount).appendTo(rowss);
-                     }
-                     $("#header tr").click(function() {
-                         $("tr").attr('onclick', '');
-                     });
-
-                     j("#source1 tr").click(function() {
-                         if (j(this).hasClass("selected")) {
-                             j(this).removeClass('selected');
-                             populateEAAmount();
-                             calculateAmount();
-                         } else {
-                             j(this).addClass('selected');
-                             populateEAAmount();
-                             calculateAmount();
-                         }
-                     });
-                 }
-             });
-     });
-     mainTable.appendTo("#box1");
-     var header = defaultPagePath + 'backbtnPage.html';
-     j('#mainHeader').load(header);
- }
-
- function fetchExpenseClaimFromMain() {
-     j('#source').remove();
-     mytable = j('<table></table>').attr({
-         id: "source",
-         class: ["table", "table-striped", "table-bordered"].join(' ')
-     });
-     var rowThead = j("<thead></thead>").appendTo(mytable);
-     var rowTh = j('<tr></tr>').attr({
-         class: ["test"].join(' ')
-     }).appendTo(rowThead);
-
-     j('<th lang=\'en\'></th>').text("Date").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Expense Name").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Narration From/To Loc").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Amt").appendTo(rowTh);
-     var cols = new Number(5);
-
-     mydb.transaction(function(t) {
-         var headerOprationBtn;
-         t.executeSql('SELECT * FROM businessExpDetails INNER JOIN expNameMst ON businessExpDetails.expNameId =expNameMst.id INNER JOIN currencyMst ON businessExpDetails.currencyId =currencyMst.currencyId INNER JOIN accountHeadMst ON businessExpDetails.accHeadId =accountHeadMst.accountHeadId;', [],
-             function(transaction, result) {
-                 if (result != null && result.rows != null) {
-
-                     for (var i = 0; i < result.rows.length; i++) {
-
-                         var row = result.rows.item(i);
-                         var shrinkFromTo;
-                         var newDateFormat = reverseConvertDate(row.expDate.substring(0, 2)) + "-" + row.expDate.substring(3, 5) + " " + row.expDate.substring(6, 10);
-
-                         if (window.localStorage.getItem("MobileMapRole") == 'true') {
-                             if (row.expFromLoc != '' && row.expToLoc != '') {
-                                 var shrinkNarration = row.expNarration.substring(0, row.expNarration.indexOf("--"))
-                                 srinckFromTo = row.expFromLoc.substring(0, row.expFromLoc.indexOf(",")) + "/" + row.expToLoc.substring(0, row.expToLoc.indexOf(","));
-                                 srinckFromTo = srinckFromTo.concat("...");
-                             }
-                         }
-
-                         var rowss = j('<tr></tr>').attr({
-                             class: ["test"].join(' ')
-                         }).appendTo(mytable);
-
-                         j('<td></td>').attr({
-                             class: ["expDate"].join(' ')
-                         }).html('<p style="color: black;">' + newDateFormat + '</P>').appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expName"].join(' ')
-                         }).html('<p style="color: black;">' + row.expName + '</P>').appendTo(rowss).appendTo(rowss);
-                         if (window.localStorage.getItem("MobileMapRole") == 'true') {
-                             if (row.expFromLoc != '' && row.expToLoc != '') {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p style="color: black;">' + shrinkNarration + '</br>' + srinckFromTo + '</P>').appendTo(rowss);
-                             } else {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p style="color: black;">' + row.expNarration + '</br>' + row.expFromLoc + "" + row.expToLoc + '</P>').appendTo(rowss);
-                             }
-                         } else {
-                             if (row.expFromLoc != '' && row.expToLoc != '') {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p style="color: black;">' + row.expNarration + '</br>' + row.expFromLoc + "/" + row.expToLoc + '</P>').appendTo(rowss);
-                             } else {
-                                 j('<td></td>').attr({
-                                     class: ["expNarration"].join(' ')
-                                 }).html('<p style="color: black;">' + row.expNarration + '</br>' + row.expFromLoc + "" + row.expToLoc + '</P>').appendTo(rowss);
-                             }
-                         }
-
-                         if (row.busExpAttachment.length == 0) {
-                             j('<td></td>').attr({
-                                 class: ["expAmt"].join(' ')
-                             }).html('<p style="color: black;">' + row.expAmt + ' ' + row.currencyName + '</P>').appendTo(rowss);
-                         } else {
-                             j('<td></td>').attr({
-                                 class: ["expAmt"].join(' ')
-                             }).html('<p style="color: black;">' + row.expAmt + ' ' + row.currencyName + '</P><img src="images/attach.png" width="25px" height="25px">').appendTo(rowss);
-                         }
-                         j('<td></td>').attr({
-                             class: ["expDate1", "displayNone"].join(' ')
-                         }).text(row.expDate).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expFromLoc1", "displayNone"].join(' ')
-                         }).text(row.expFromLoc).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expToLoc1", "displayNone"].join(' ')
-                         }).text(row.expToLoc).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expNarration1", "displayNone"].join(' ')
-                         }).text(row.expNarration).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expAmt1", "displayNone"].join(' ')
-                         }).text(row.expAmt).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["busAttachment", "displayNone"].join(' ')
-                         }).text(row.busExpAttachment).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["accHeadId", "displayNone"].join(' ')
-                         }).text(row.accHeadId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expNameId", "displayNone"].join(' ')
-                         }).text(row.expNameMstId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expUnit", "displayNone"].join(' ')
-                         }).text(row.expUnit).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["currencyId", "displayNone"].join(' ')
-                         }).text(row.currencyId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["accountCodeId", "displayNone"].join(' ')
-                         }).text(row.accCodeId).appendTo(rowss);
-                         //j('<td></td>').attr({ class: ["expName","displayNone"].join(' ') }).text(row.expName).appendTo(rowss);       
-                         j('<td></td>').attr({
-                             class: ["busExpId", "displayNone"].join(' ')
-                         }).text(row.busExpId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isErReqd", "displayNone"].join(' ')
-                         }).text(row.isErReqd).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["ERLimitAmt", "displayNone"].join(' ')
-                         }).text(row.limitAmountForER).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isEntitlementExceeded", "displayNone"].join(' ')
-                         }).text(row.isEntitlementExceeded).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["wayPoint", "displayNone"].join(' ')
-                         }).text(row.wayPointunitValue).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isAttachmentReq", "displayNone"].join(' ')
-                         }).text(row.isAttachmentReq).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isEntiLineOrVoucherLevel", "displayNone"].join(' ')
-                         }).text(row.isEntiLineOrVoucherLevel).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expFixedLimitAmt", "displayNone"].join(' ')
-                         }).text(row.expFixedLimitAmt).appendTo(rowss);
-                     }
-
-                     j("#source tr").click(function() {
-                         headerOprationBtn = defaultPagePath + 'headerPageForBEOperation.html';
-                         if (j(this).hasClass("selected")) {
-                             j(this).removeClass('selected');
-                             j('#mainHeader').load(headerOprationBtn);
-                         } else {
-                             if (j(this).text() == 'DateExpense NameNarration From/To LocAmt') {
-
-                             } else {
-                                 j('#mainHeader').load(headerOprationBtn);
-                                 j(this).addClass('selected');
-                             }
-                         }
-                     });
-
-                     j(function() {
-                         j("#source tr").on("swipe", swipeHandler);
-
-                         function swipeHandler(event) {
-                             alert("asd");
-                         }
-                     });
-
-                 }
-             });
-     });
-     mytable.appendTo("#box");
-     var header = defaultPagePath + 'backbtnPage.html';
-     j('#mainHeader').load(header);
- }
-
- function fetchTravelSettlementExpFromMain() {
-     j('#source').remove();
-     mytable = j('<table></table>').attr({
-         id: "source",
-         class: ["table", "table-striped", "table-bordered"].join(' ')
-     });
-
-     var rowThead = j("<thead></thead>").appendTo(mytable);
-     var rowTh = j('<tr></tr>').attr({
-         class: ["test"].join(' ')
-     }).appendTo(rowThead);
-
-     j('<th lang=\'en\'></th>').text("Date").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Expense Name").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Amt").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("cityTown").appendTo(rowTh);
-     j('<th lang=\'en\'></th>').text("Narration").appendTo(rowTh);
-
-     var cols = new Number(4);
-
-     mydb.transaction(function(t) {
-
-         t.executeSql('select * from travelSettleExpDetails inner join cityTownMst on cityTownMst.cityTownId = travelSettleExpDetails.cityTownId inner join currencyMst on travelSettleExpDetails.currencyId = currencyMst.currencyId inner join travelExpenseNameMst on travelExpenseNameMst.id = travelSettleExpDetails.expNameId;', [],
-             function(transaction, result) {
-
-                 if (result != null && result.rows != null) {
-
-                     for (var i = 0; i < result.rows.length; i++) {
-
-                         var row = result.rows.item(i);
-
-                         var newDateFormat = reverseConvertDate(row.expDate.substring(0, 2)) + "-" + row.expDate.substring(3, 5) + " " + row.expDate.substring(6, 10);
-
-                         var rowss = j('<tr></tr>').attr({
-                             class: ["test"].join(' ')
-                         }).appendTo(mytable);
-
-                         j('<td></td>').attr({
-                             class: ["expDate"].join(' ')
-                         }).html('<p style="color: black;">' + newDateFormat + '</P>').appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expenseName"].join(' ')
-                         }).html('<p style="color: black;">' + row.expenseName + '</P>').appendTo(rowss).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expAmt"].join(' ')
-                         }).html('<p>' + row.expAmt + ' ' + row.currencyName + '</P>').appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["cityTownName"].join(' ')
-                         }).html('<p style="color: black;">' + row.cityTownName + '</P>').appendTo(rowss);
-
-                         if (row.tsExpAttachment.length == 0) {
-                             j('<td></td>').attr({
-                                 class: ["expNarration"].join(' ')
-                             }).html('<p>' + row.expNarration + '</P>').appendTo(rowss);
-                         } else {
-                             j('<td></td>').attr({
-                                 class: ["expNarration"].join(' ')
-                             }).html('<p>' + row.expNarration + '</P><img src="images/attach.png" width="25px" height="25px">').appendTo(rowss);
-                         }
-                         j('<td></td>').attr({
-                             class: ["expDate1", "displayNone"].join(' ')
-                         }).text(row.expDate).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expAmt1", "displayNone"].join(' ')
-                         }).text(row.expAmt).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expNarration1", "displayNone"].join(' ')
-                         }).text(row.expNarration).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["travelRequestId", "displayNone"].join(' ')
-                         }).text(row.travelRequestId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["tsExpAttachment", "displayNone"].join(' ')
-                         }).text(row.tsExpAttachment).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expNameId", "displayNone"].join(' ')
-                         }).text(row.expenseNameId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expUnit", "displayNone"].join(' ')
-                         }).text(row.expUnit).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["currencyId", "displayNone"].join(' ')
-                         }).text(row.currencyId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["modeId", "displayNone"].join(' ')
-                         }).text(row.travelModeId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["categoryId", "displayNone"].join(' ')
-                         }).text(row.travelCategoryId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["fromcityTownId", "displayNone"].join(' ')
-                         }).text(row.cityTownId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["accountCodeId", "displayNone"].join(' ')
-                         }).text(row.accCodeId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["expName", "displayNone"].join(' ')
-                         }).text(row.expenseName).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["tsExpId", "displayNone"].join(' ')
-                         }).text(row.tsExpId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["isModeCategory", "displayNone"].join(' ')
-                         }).text(row.isModeCategory).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["accountCodeId", "displayNone"].join(' ')
-                         }).text(row.accountCodeId).appendTo(rowss);
-                     }
-
-                     j("#source tr").click(function() {
-                         headerOprationBtn = defaultPagePath + 'headerPageForTSOperation.html';
-                         if (j(this).hasClass("selected")) {
-                             var headerBackBtn = defaultPagePath + 'headerPageForTSOperation.html';
-                             j(this).removeClass('selected');
-                             j('#mainHeader').load(headerBackBtn);
-                         } else {
-                             if (j(this).text() == 'DateExpense NameAmtcityTownNarration') {
-
-                             } else {
-                                 j('#mainHeader').load(headerOprationBtn);
-                                 j(this).addClass('selected');
-                             }
-                         }
-                     });
-                 }
-             });
-     });
-     mytable.appendTo("#box");
-     var header = defaultPagePath + 'backbtnPage.html';
-     j('#mainHeader').load(header);
- }
-
- //  SMS changes
- function saveSMS(sms) {
-     j('#loading_Cat').show();
-     if (mydb) {
-         //save incoming sms
-         var smsMsg = sms.body;
-         var senderAddress = "" + sms.address;
-         senderAddress = senderAddress.toLowerCase();
-         var smsSentDate = getFormattedDateFromMillisec(parseInt(sms.date_sent));
-         var smsAmount = parseIncomingSMSForAmount(smsMsg);
-         if (smsMsg != "") {
-             mydb.transaction(function(t) {
-                 t.executeSql("INSERT INTO smsMaster (smsText,senderAddr,smsSentDate,smsAmount) VALUES (?,?,?,?)", [smsMsg, senderAddress, smsSentDate, smsAmount]);
-             });
-             j('#loading_Cat').hide();
-         } else {
-             j('#loading_Cat').hide();
-         }
-     } else {
-         alert("db not found, your browser does not support web sql!");
-     }
- }
-
- function fetchSMSClaim() {
-     mytable = j('<table></table>').attr({
-         id: "source",
-         class: ["table", "table-striped", "table-bordered"].join(' ')
-     });
-     var rowThead = j("<thead></thead>").appendTo(mytable);
-     var rowTh = j('<tr></tr>').attr({
-         class: ["test"].join(' ')
-     }).appendTo(rowThead);
-
-     j('<th></th>').text("SMS Date").appendTo(rowTh);
-     j('<th></th>').text("Expense type").appendTo(rowTh);
-     j('<th></th>').text("Text").appendTo(rowTh);
-     j('<th></th>').text("Amt").appendTo(rowTh);
-     var cols = new Number(5);
-
-     mydb.transaction(function(t) {
-         /*      mydb.transaction(function (t) {
-                          t.executeSql("INSERT INTO smsMaster (smsId,smsSentDate,senderAddr,smsText,smsAmount) VALUES (?, ?, ?, ?,?)", 
-                                                    [1,"23-Dec-2016","VM_IPAYTM","successfully  Rs.600 ","600.00"]);
-                        });*/
-         var headerOprationBtn;
-         t.executeSql('SELECT * FROM smsMaster;', [],
-             function(transaction, result) {
-                 if (result != null && result.rows != null) {
-
-                     for (var i = 0; i < result.rows.length; i++) {
-                         var row = result.rows.item(i);
-                         var smsAmount = parseIncomingSMSForAmount(row.smsText);
-                         var rowss = j('<tr></tr>').attr({
-                             class: ["test"].join(' ')
-                         }).appendTo(mytable);
-                         j('<td></td>').attr({
-                             class: ["smsSentDate", ""].join(' ')
-                         }).text(row.smsSentDate).appendTo(rowss);
-                         // j('<td></td>').attr({ class: ["senderAddr",""].join(' ') }).text(row.senderAddr).appendTo(rowss);
-                         j(rowss).append('<td><img width="50px" height="50px" src="images/' + row.senderAddr + '.png"/></td>');
-                         j('<td></td>').attr({
-                             class: ["smsText", ""].join(' ')
-                         }).text(row.smsText).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["smsAmount", ""].join(' ')
-                         }).text(row.smsAmount).appendTo(rowss);
-                         // j(rowss).append('<td><input type = "text"  id = "amt" value= "'+ smsAmount +'" style = "width: 50px;"/></td>');
-                         j('<td></td>').attr({
-                             class: ["smsId", "displayNone"].join(' ')
-                         }).text(row.smsId).appendTo(rowss);
-                         j('<td></td>').attr({
-                             class: ["sender", "displayNone"].join(' ')
-                         }).text(row.senderAddr).appendTo(rowss);
-                     }
-
-                     j("#source tr").click(function() {
-                         headerOprationBtn = defaultPagePath + 'headerPageForSMSOperation.html';
-                         if (j(this).hasClass("selected")) {
-                             var headerBackBtn = defaultPagePath + 'headerPageForSMSOperation.html';
-                             j(this).removeClass('selected');
-                             j('#mainHeader').load(headerBackBtn);
-                         } else {
-                             if (j(this).text() == 'DateExpense expid From/To LocAmt') {
-
-                             } else {
-                                 j('#mainHeader').load(headerOprationBtn);
-                                 j(this).addClass('selected');
-                             }
-                         }
-                     });
-                 }
-             });
-     });
-     mytable.appendTo("#box");
- }
-
- function discardMessages(smsID) {
-     mydb.transaction(function(t) {
-         t.executeSql("DELETE FROM smsMaster WHERE smsId=?", [smsID]);
-     });
- }
-
- function getFiltrationConstraints() {
-     var blockedWordsList = "";
-     var allowedWordsList = "";
-     mydb.transaction(function(t) {
-         t.executeSql('SELECT * FROM smsScrutinizerMst;', [],
-             function(transaction, result) {
-                 if (result != null && result.rows != null) {
-
-                     for (var i = 0; i < result.rows.length; i++) {
-                         var row = result.rows.item(i);
-                         var status = row.status;
-                         var flag = row.filterFlag;
-                         var filterText = row.filterText;
-
-                         if (status == 1) {
-                             if (flag == 'b') {
-                                 blockedWordsList += filterText + "$";
-                             } else if (flag == 'w') {
-                                 allowedWordsList += filterText + "$"
-                             }
-                         }
-
-                     }
-                 }
-             });
-     });
-     setTimeout(function() {
-         tempFilterStr = blockedWordsList + "@" + allowedWordsList;
-         if (tempFilterStr) {
-             filtersStr = tempFilterStr;
-             window.localStorage.setItem("SMSFilterationStr", filtersStr);
-         }
-         return tempFilterStr
-     }, 50);
- }
-
- function synchronizeWhiteListMasterData() {
-     var jsonSentToSync = new Object();
-
-     j('#loading_Cat').show();
-     var blockedWordsList = "";
-     var allowedWordsList = "";
-     if (mydb) {
-         j.ajax({
-             url: window.localStorage.getItem("urlPath") + "SyncWhiteListMasterWebService",
-             type: 'POST',
-             dataType: 'json',
-             crossDomain: true,
-             data: JSON.stringify(jsonSentToSync),
-             success: function(data) {
-                 if (data.Status == 'Success') {
-                     mydb.transaction(function(t) {
-                         t.executeSql("DELETE FROM smsScrutinizerMst");
-                         var whiteListArray = data.WhiteListArray;
-                         if (whiteListArray != null && whiteListArray.length > 0) {
-                             for (var i = 0; i < whiteListArray.length; i++) {
-                                 var msgArr = new Array();
-                                 msgArr = whiteListArray[i];
-                                 var wbl_id = msgArr.ID;
-                                 var filter_Text = msgArr.FilterText;
-                                 var filter_Flag = msgArr.FilterFlag;
-                                 var status = msgArr.Status;
-
-                                 t.executeSql("INSERT INTO smsScrutinizerMst (ID, filterText, filterFlag, status) VALUES (?, ?, ?, ?)", [wbl_id, filter_Text, filter_Flag, status]);
-
-                             }
-                         }
-                     });
-
-                     j('#loading_Cat').hide();
-                     document.getElementById("syncSuccessMsg").innerHTML = "SMS Status Master synchronized successfully.";
-                     j('#syncSuccessMsg').hide().fadeIn('slow').delay(500).fadeOut('slow');
-                     setTimeout(function() {
-                         //console.log("before getFiltrationConstraints call")
-                         getFiltrationConstraints();
-                     }, 2000);
-                 } else {
-                     j('#loading_Cat').hide();
-                     document.getElementById("syncFailureMsg").innerHTML = "SMS Status Master not synchronized successfully.";
-                     j('#syncFailureMsg').hide().fadeIn('slow').delay(300).fadeOut('slow');
-
-                 }
-
-             },
-             error: function(data) {
-                 alert("Error: Oops something is wrong, Please Contact System Administer");
-             }
-         });
-     } else {
-         alert("db not found, your browser does not support web sql!");
-     }
-
- }
-
- function showMultiLanguag() {
-     var headerBackBtn = defaultPagePath + 'backbtnPage.html';
-     // var pageRef=defaultPagePath+'helpMenuPage.html';
-     var pageRef = defaultPagePath + 'multiLanguage.html';
-     j(document).ready(function() {
-         j('#mainHeader').load(headerBackBtn);
-         j('#mainContainer').load(pageRef);
-     });
-     appPageHistory.push(pageRef);
- }
-
- function onSuccessBE(imageData) {
-     try {
-         setTimeout(function() {
-
-             smallImageBE.style.display = 'block';
-             document.getElementById('imageBE').setAttribute('src', "data:image/jpeg;base64," + imageData);
-             smallImageBE.src = "data:image/jpeg;base64," + imageData;
-             fileTempGalleryBE = "data:image/jpeg;base64," + imageData;
-             fileTempCameraBE = "";
-         }, 3000);
-     } catch (e) {
-         alert("Error gallery : " + e);
-     }
- }
-
- function onFail(message) {
-     alert('Failed because: ' + message);
- }
-
- //********************  Methods For Attachment -- Start ******************************//
-
- function showAttachmentmessage() {
-     var isAttachmentRequired = perUnitDetailsJSON.isAttachmentReq;
-
-     if (isAttachmentRequired == 'Y') {
-         j('#errorMsgAreaForAttachment').children('span').text("Attachment is mandatory");
-     } else {
-         j('#errorMsgAreaForAttachment').children('span').text("");
-     }
- }
-
- //********************  Methods For Attachment -- End ******************************//
-
- function validateExpenseAmtForVoucher(jsonToSaveEA) {
-
-     var expenses = jsonToSaveEA.expenseDetails;
-     var map = new Map();
-     var msg = "";
-
-     console.log("expenses : " + JSON.stringify(expenses));
-
-     for (var i = 0; i < expenses.length; i++) {
-         //alert("expenses[i].isEntiLineOrVoucherLevel : "+expenses[i].isEntiLineOrVoucherLevel);
-
-         if (expenses[i].isEntiLineOrVoucherLevel == ("V") && expenses[i].expFixedLimitAmt != 0) {
-
-             var expId = expenses[i].ExpenseId;
-             var expName = expenses[i].ExpenseName;
-             var isEntiLineOrVoucherLevel = expenses[i].isEntiLineOrVoucherLevel;
-             var ERLimitAmt = expenses[i].ERLimitAmt;
-             var amount = expenses[i].amount;
-             var ERFixedLimit = expenses[i].expFixedLimitAmt;
-             var keyForMap = expId + "$" + ERFixedLimit + "$" + expName;
-
-             if (map.has(keyForMap)) {
-                 var value = map.get(keyForMap);
-
-                 map.set(keyForMap, parseInt(value) + parseInt(amount));
-             } else {
-                 map.set(keyForMap, parseInt(amount));
-             }
-
-         }
-
-     }
-
-     map.forEach(function(value, key, map) {
-
-         var array = new Array();
-         array = key.split("$");
-
-         var expId = array[0];
-
-         var expLimitAmt = array[1];
-
-         var expName = array[2];
-
-         console.log("expId expLimitAmt expName : " + expId + "" + expLimitAmt + "" + expName);
-
-         if (parseInt(expLimitAmt) < parseInt(value)) {
-
-             msg = msg + " Amount entered " + value + " exceeds defined entitled limit of " + expLimitAmt + " for Expense : " + expName;
-             msg = msg + '\n';
-
-         }
-
-         console.log('key: "' + key + '", value: "' + value + '"');
-     });
-
-     if (msg != "") {
-         var entitlementMsg = confirm(msg);
-
-         if (entitlementMsg == true) {
-             return true;
-         } else {
-             return false;
-         }
-     } else {
-         return true;
-     }
-
- }
-
- //********************  Methods For Entitlement Changes For Buss-Exp-EA -- Start ******************************//
-
- function validateMontlyAmtForVoucherForBEWithEA(jsonToSaveBE, busExpDetailsArr, empAdvArr, pageRefSuccess, pageRefFailure) {
-     j('#loading_Cat').show();
-
-     j.ajax({
-         url: window.localStorage.getItem("urlPath") + "ValidateBusExpPeriodictyWebService",
-         type: 'POST',
-         dataType: 'json',
-         crossDomain: true,
-         data: JSON.stringify(jsonToSaveBE),
-         success: function(data) {
-             if (data.Status == "Success") {
-                 if (data.hasOwnProperty('DelayStatus')) {
-                     setDelayMessage(data, jsonToSaveBE, busExpDetailsArr);
-                     j('#loading_Cat').hide();
-                 } else {
-                     successMessage = data.Message;
-
-                     if (successMessage != "") {
-                         var confirmBox = confirm(successMessage);
-
-                         if (confirmBox == true) {
-                             approvalServiceForBEwithEA(jsonToSaveBE, busExpDetailsArr, empAdvArr, pageRefSuccess, pageRefFailure);
-                         } else {
-                             entitlementMsg = false;
-                         }
-                     } else {
-                         approvalServiceForBEwithEA(jsonToSaveBE, busExpDetailsArr, empAdvArr, pageRefSuccess, pageRefFailure);
-                     }
-
-                     requestRunning = false;
-                     j('#loading_Cat').hide();
-                     //j('#mainHeader').load(headerBackBtn);
-                     //j('#mainContainer').load(pageRefSuccess);
-                     // appPageHistory.push(pageRef);
-                 }
-             } else if (data.Status == "Failure") {
-                 successMessage = data.Message;
-                 requestRunning = false;
-                 j('#loading_Cat').hide();
-                 j('#mainHeader').load(headerBackBtn);
-                 j('#mainContainer').load(pageRefFailure);
-             } else {
-                 j('#loading_Cat').hide();
-                 successMessage = "Oops!! Something went wrong. Please contact system administrator.";
-                 requestRunning = false;
-                 j('#mainHeader').load(headerBackBtn);
-                 j('#mainContainer').load(pageRefFailure);
-             }
-         },
-         error: function(data) {
-             j('#loading_Cat').hide();
-             requestRunning = false;
-             alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-         }
-     });
-
-     //}, 100);
- }
-
- function approvalServiceForBEwithEA(jsonToSaveBE, busExpDetailsArr, empAdvArr, pageRefSuccess, pageRefFailure) {
-     j('#loading_Cat').show();
-     var headerBackBtn = defaultPagePath + 'backbtnPage.html';
-
-     j.ajax({
-         url: window.localStorage.getItem("urlPath") + "SynchSubmitBusinessExpense",
-         type: 'POST',
-         dataType: 'json',
-         crossDomain: true,
-         data: JSON.stringify(jsonToSaveBE),
-         success: function(data) {
-             if (data.Status == "Success") {
-                 if (data.hasOwnProperty('DelayStatus')) {
-                     setDelayMessage(data, jsonToSaveBE, busExpDetailsArr);
-                     j('#loading_Cat').hide();
-                 } else {
-                     successMessage = data.Message;
-                     for (var i = 0; i < busExpDetailsArr.length; i++) {
-                         var businessExpDetailId = busExpDetailsArr[i];
-                         deleteSelectedExpDetails(businessExpDetailId);
-                     }
-                     for (var i = 0; i < empAdvArr.length; i++) {
-                         var empAdvId = empAdvArr[i];
-                         deleteSelectedEmplAdv(empAdvId);
-                     }
-                     requestRunning = false;
-                     j('#loading_Cat').hide();
-                     j('#mainHeader').load(headerBackBtn);
-                     j('#mainContainer').load(pageRefSuccess);
-                     // appPageHistory.push(pageRef);
-                 }
-             } else if (data.Status == "Failure") {
-                 successMessage = data.Message;
-                 requestRunning = false;
-                 j('#loading_Cat').hide();
-                 j('#mainHeader').load(headerBackBtn);
-                 j('#mainContainer').load(pageRefFailure);
-             } else {
-                 j('#loading_Cat').hide();
-                 successMessage = "Oops!! Something went wrong. Please contact system administrator.";
-                 requestRunning = false;
-                 j('#mainHeader').load(headerBackBtn);
-                 j('#mainContainer').load(pageRefFailure);
-             }
-         },
-         error: function(data) {
-             j('#loading_Cat').hide();
-             requestRunning = false;
-             alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-         }
-     });
- }
-
- //********************  Methods For Entitlement Changes For Buss-Exp-EA -- End ******************************//
-
- //********************  Methods For Entitlement Changes For Buss-Exp -- Start ******************************//
-
- function validateMontlyAmtForVoucherForBE(jsonToSaveBE, busExpDetailsArr, pageRefSuccess, pageRefFailure) {
-     j('#loading_Cat').show();
-
-     j.ajax({
-         url: window.localStorage.getItem("urlPath") + "ValidateBusExpPeriodictyWebService",
-         type: 'POST',
-         dataType: 'json',
-         crossDomain: true,
-         data: JSON.stringify(jsonToSaveBE),
-         success: function(data) {
-             if (data.Status == "Success") {
-                 if (data.hasOwnProperty('DelayStatus')) {
-                     setDelayMessage(data, jsonToSaveBE, busExpDetailsArr);
-                     j('#loading_Cat').hide();
-                 } else {
-                     successMessage = data.Message;
-
-                     if (successMessage != "") {
-                         var confirmBox = confirm(successMessage);
-
-                         if (confirmBox == true) {
-                             approvalServiceForBE(jsonToSaveBE, busExpDetailsArr, pageRefSuccess, pageRefFailure);
-                         } else {
-                             entitlementMsg = false;
-                         }
-                     } else {
-                         approvalServiceForBE(jsonToSaveBE, busExpDetailsArr, pageRefSuccess, pageRefFailure);
-                     }
-
-                     requestRunning = false;
-                     j('#loading_Cat').hide();
-                     //j('#mainHeader').load(headerBackBtn);
-                     //j('#mainContainer').load(pageRefSuccess);
-                     // appPageHistory.push(pageRef);
-                 }
-             } else if (data.Status == "Failure") {
-                 successMessage = data.Message;
-                 requestRunning = false;
-                 j('#loading_Cat').hide();
-                 j('#mainHeader').load(headerBackBtn);
-                 j('#mainContainer').load(pageRefFailure);
-             } else {
-                 j('#loading_Cat').hide();
-                 successMessage = "Oops!! Something went wrong. Please contact system administrator.";
-                 requestRunning = false;
-                 j('#mainHeader').load(headerBackBtn);
-                 j('#mainContainer').load(pageRefFailure);
-             }
-         },
-         error: function(data) {
-             j('#loading_Cat').hide();
-             requestRunning = false;
-             alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-         }
-     });
-
-     //}, 100);
- }
-
- function approvalServiceForBE(jsonToSaveBE, busExpDetailsArr, pageRefSuccess, pageRefFailure) {
-     j('#loading_Cat').show();
-
-     var headerBackBtn = defaultPagePath + 'backbtnPage.html';
-
-     j.ajax({
-         url: window.localStorage.getItem("urlPath") + "SynchSubmitBusinessExpense",
-         type: 'POST',
-         dataType: 'json',
-         crossDomain: true,
-         data: JSON.stringify(jsonToSaveBE),
-         success: function(data) {
-             if (data.Status == "Success") {
-                 if (data.hasOwnProperty('DelayStatus')) {
-                     setDelayMessage(data, jsonToSaveBE, busExpDetailsArr);
-                     j('#loading_Cat').hide();
-                 } else {
-                     successMessage = data.Message;
-                     for (var i = 0; i < busExpDetailsArr.length; i++) {
-                         var businessExpDetailId = busExpDetailsArr[i];
-                         deleteSelectedExpDetails(businessExpDetailId);
-                     }
-                     requestRunning = false;
-                     j('#loading_Cat').hide();
-                     j('#mainHeader').load(headerBackBtn);
-                     j('#mainContainer').load(pageRefSuccess);
-                     // appPageHistory.push(pageRef);
-                 }
-             } else if (data.Status == "Failure") {
-                 successMessage = data.Message;
-                 requestRunning = false;
-                 j('#loading_Cat').hide();
-                 j('#mainHeader').load(headerBackBtn);
-                 j('#mainContainer').load(pageRefFailure);
-             } else {
-                 j('#loading_Cat').hide();
-                 requestRunning = false;
-                 successMessage = "Oops!! Something went wrong. Please contact system administrator.";
-                 j('#mainHeader').load(headerBackBtn);
-                 j('#mainContainer').load(pageRefFailure);
-             }
-         },
-         error: function(data) {
-             j('#loading_Cat').hide();
-             requestRunning = false;
-             alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-
-         }
-     });
-
- }
-
- //********************  Methods For Entitlement Changes For Buss-Exp -- End ******************************//
-
- // *********************************  Upcoming Trips  -- Start *******************************************//
-
- function fetchDateForTrips() {
-     var jsonForTrips = new Object();
-     jsonForTrips["EmployeeId"] = window.localStorage.getItem("EmployeeId");
-     ajaxCallForTripDates(jsonForTrips);
- }
-
- function ajaxCallForTripDates(jsonForTrips) {
-     urlPath = window.localStorage.getItem("urlPath");
-     j.ajax({
-         url: urlPath + "FetchDateForTrips",
-         type: 'POST',
-         dataType: 'json',
-         crossDomain: true,
-         data: JSON.stringify(jsonForTrips),
-         success: function(data) {
-             if (data.Status == "Success") {
-                 var travelRequestDetails = data.TravelRequestDetails;
-                 setDynamicDate(travelRequestDetails);
-             }
-         },
-         error: function(data) {
-             alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-         }
-     });
- }
-
- function setDynamicDate(travelRequestDetails) {
-     if (travelRequestDetails != null && travelRequestDetails.length > 0) {
-         j('#dateClaimsbox').empty();
-
-         for (var i = 0; i < travelRequestDetails.length; i++) {
-
-             var stateArr = new Array();
-             stateArr = travelRequestDetails[i];
-             var tripDate = stateArr.travelDate;
-             var from_loc = stateArr.from;
-             var to_loc = stateArr.to;
-             var tr_title_upcomingtrip = stateArr.tr_title;
-             var requestTripId = stateArr.travelRequestId;
-
-             try {
-                 var s =
-                     "<li onclick ='fetchTripDetails(" + i + "," + requestTripId + ");'>" + "<div class='trippreflist'>" + "<span class='pull-left'>" + "<input class='abc' id='tripDate_" + i + "' type=button value=" + tripDate + " >" + "</span>" + "<div class='pull-left'>" + "<table class='uptripstxttable'>" + "<tr><td colspan='4'><input class='sltpreftrip' id='tr_title_upcomingtrip_" + i + "' readonly='true' value=\"" + tr_title_upcomingtrip + "\"></td></tr>" + "<tr><td>From: </td><td><input class='fligtprefdate' id='from_" + i + "' readonly='true' value=" + from_loc + "></td><td>To: </td><td><input class='fligtprefdate' id='to_" + i + "' readonly='true' value=" + to_loc + "></td></tr>" + "</table>" + "</div>" + "</div>" + "</li>";
-
-             } catch (e) {
-                 alert("exception in dynamic page : " + e);
-             }
-
-             j('#dateClaimsbox').append(s);
-         }
-
-     } else {
-         if (document.getElementById('tabNoUpcomingDate') != null) {
-             document.getElementById('tabNoUpcomingDate').style.display = '';
-         }
-     }
-
- }
-
- function formatDateNew(date1) {
-
-     var d = new Date(date1),
-         month = '' + (d.getMonth() + 1),
-         day = '' + d.getDate(),
-         year = d.getFullYear();
-
-     if (month.length < 2) month = '0' + month;
-     if (day.length < 2) day = '0' + day;
-
-     return [year, month, day].join('-');
-
- }
-
- function fetchTripDetails(i, requestTripId) {
-
-     document.getElementById('firstDiv').style.display = 'none';
-     document.getElementById('tabTrip1').style.display = '';
-     document.getElementById('tripdet').style.display = '';
-
-     var jsonForTripDetails = new Object();
-     jsonForTripDetails["travelRequestId"] = requestTripId;
-     var dateFormat1 = document.getElementById("tripDate_" + i).value;
-     dateNew = formatDateNew(dateFormat1);
-     jsonForTripDetails["expStartDate"] = dateNew;
-     ajaxCallForTripDetails(jsonForTripDetails);
- }
-
- function ajaxCallForTripDetails(jsonForTripDetails) {
-     urlPath = window.localStorage.getItem("urlPath");
-     j.ajax({
-         url: urlPath + "FetchTripDetails",
-         type: 'POST',
-         dataType: 'json',
-         crossDomain: true,
-         data: JSON.stringify(jsonForTripDetails),
-         success: function(data) {
-
-             var TravelFlightDetails = data.TravelFlightDetails;
-
-             var TravelCabDetails = data.TravelCabDetails;
-
-             var TravelAccDetails = data.TravelAccDetails;
-
-             setDynamicDetails(TravelFlightDetails, TravelCabDetails, TravelAccDetails);
-
-         },
-         error: function(data) {
-             alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-         }
-     });
-
- }
-
- function setDynamicDetails(TravelFlightDetails, TravelCabDetails, TravelAccDetails) {
-
-     if (TravelFlightDetails != null && TravelFlightDetails.length > 0) {
-         j('#tripList').empty();
-         for (var i = 0; i < TravelFlightDetails.length; i++) {
-             var stateArr1 = new Array();
-             stateArr1 = TravelFlightDetails[i];
-
-             var to_Flight = stateArr1.to;
-             var from_Flight = stateArr1.from;
-             var from_date_Flight = stateArr1.from_date;
-             var to_date_Flight = stateArr1.to_date;
-             var carrier_name_Flight = stateArr1.carrier_name;
-             var flight_no_Flight = stateArr1.flight_no;
-             var pnr_id_Flight = stateArr1.pnr_id;
-             try {
-
-                 var data1 = "<li class='airplan'>" + "<div class='trippreflist'>" + "<span class='pull-left tripreficon'><a href='#'><i class='fa fa-plane'></i></a></span>" + "<div class='pull-left triprefblock'>" + "<table class='uptripstxttable'>" + "<tr><td>From: </td><td><input class='uptripstxtfld' id='from_Flight_" + i + "' readonly='true' value=" + from_Flight + "></td><td>&nbsp;To: </td><td><input class='uptripstxtfld' id='to_Flight_" + i + "' readonly='true' value=" + to_Flight + "></td></tr>" + "<tr><td>From: </td><td><input class='uptripstxtfld' id='from_date_Flight_" + i + "' readonly='true' value=" + from_date_Flight + "></td><td>&nbsp;To: </td><td><input class='uptripstxtfld' id='to_date_Flight_" + i + "' readonly='true' value=" + to_date_Flight + "></td></tr>" + "<tr><td class='carriarnametd'>Carrier Name: </td><td><input class='uptripstxtfld' id='carrier_name_Flight_" + i + "' readonly='true' value= \"" + carrier_name_Flight + "\"></td><td class='carriarnametd'>&nbsp;Flight Number: </td><td><input class='uptripstxtfld' id='flight_no_Flight_" + i + "' readonly='true' value=" + flight_no_Flight + "></td></tr>" + "<tr><td>PNR Id: </td><td><input class='uptripstxtfld' id='pnr_id_Flight_" + i + "' readonly='true' value=" + pnr_id_Flight + "></td><td>&nbsp;</td><td>&nbsp;</td></tr>" + "</table>" + "</div>" + "</div>" + "</li>";
-
-             } catch (e) {
-                 alert("exception in dynamic page : " + e);
-             }
-             j('#tripList').append(data1);
-         }
-
-     }
-
-     if (TravelCabDetails != null && TravelCabDetails.length > 0) {
-         for (var i = 0; i < TravelCabDetails.length; i++) {
-             var stateArr = new Array();
-             stateArr = TravelCabDetails[i];
-             var fromCab = stateArr.from;
-             var toCab = stateArr.to;
-             var from_dateCab = stateArr.from_date;
-             var to_dateCab = stateArr.to_date;
-             var carrier_name = stateArr.carrier_name;
-
-             try {
-                 var data2 = "<li class='carplan'>" + "<div class='trippreflist'>" + "<span class='pull-left tripreficon'><a href='#'><i class='fa fa-cab'></i></a></span>" + "<div class='pull-left triprefblock'>" + "<table class='uptripstxttable'>" + "<tr><td>From: </td><td><input class='uptripstxtfld' id='fromCab_" + i + "' readonly='true' value=" + fromCab + "></td><td>To: </td><td><input class='uptripstxtfld' id='todateCab_" + i + "'  readonly='true' value=" + toCab + "></td></tr>" + "<tr><td>From: </td><td><input class='uptripstxtfld' id='from_dateCab_" + i + "' readonly='true' value=" + from_dateCab + "></td><td>To: </td><td><input class='uptripstxtfld' id='to_dateCab_" + i + "' readonly='true' value=" + to_dateCab + "></td></tr>" + "<tr><td class='carriarnametd'>Carrier Name: </td><td><input class='uptripstxtfld' id='carrier_nameCab_" + i + "' readonly='true' value=" + carrier_name + "></td><td>&nbsp;</td><td>&nbsp;</td></tr>" + "</table>" + "</div>" + "</div>" + "</li>";
-             } catch (e) {
-                 alert("exception in dynamic page : " + e);
-             }
-
-             j('#tripList').append(data2);
-         }
-     }
-
-     if (TravelAccDetails != null && TravelAccDetails.length > 0) {
-         for (var i = 0; i < TravelAccDetails.length; i++) {
-             var stateArr = new Array();
-             stateArr = TravelAccDetails[i];
-             var hotel_name_acc = stateArr.hotel_name;
-             var location_acc = stateArr.location_acc;
-             var from_date_acc = stateArr.from_date;
-             var to_date_acc = stateArr.to_date;
-
-             try {
-                 var data3 = "<li class='accplan'>" + "<div class='trippreflist'>" + "<span class='pull-left tripreficon'><a href='#'><i class='fa fa-hospital-o'></i></a></span>" + "<div class='pull-left triprefblock'>" + "<table class='uptripstxttable'>" + "<tr><td class='carriarnametd'>Hotel Name: </td><td><input class='uptripstxtfld' id='hotel_name_acc_" + i + "' readonly='true' value=" + hotel_name_acc + "></td><td>Location: </td><td><input class='uptripstxtfld' id='location_acc_" + i + "' readonly='true' value=" + location_acc + "></td></tr>" + "<tr><td>From: </td><td><input class='uptripstxtfld' id='from_date_acc_" + i + "' readonly='true' value=" + from_date_acc + "></td><td>To: </td><td><input class='uptripstxtfld' id='to_date_acc_" + i + "' readonly='true' value=" + to_date_acc + "></td></tr>" + "</table>" + "</div>" + "</div>" + "</li>";
-             } catch (e) {
-                 alert("exception in dynamic page : " + e);
-             }
-
-             j('#tripList').append(data3);
-         }
-     }
- }
-
- function fetchRequestNos() {
-     var jsonForRequest = new Object();
-     jsonForRequest["EmployeeId"] = window.localStorage.getItem("EmployeeId");
-     ajaxCallForfetchingRequestNos(jsonForRequest);
- }
-
- function ajaxCallForfetchingRequestNos(jsonForRequest) {
-     urlPath = window.localStorage.getItem("urlPath");
-     j.ajax({
-         url: urlPath + "FetchRequestNos",
-         type: 'POST',
-         dataType: 'json',
-         crossDomain: true,
-         data: JSON.stringify(jsonForRequest),
-         success: function(data) {
-             if (data.Status == "Success") {
-                 var TravelRequestNoArray = data.TravelRequestNoArray;
-
-                 setDynamicRequestNo(TravelRequestNoArray);
-             }
-         },
-         error: function(data) {
-             alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-         }
-     });
- }
-
- function setDynamicRequestNo(travelRequestNoArray) {
-
-     if (travelRequestNoArray != null && travelRequestNoArray.length > 0) {
-         j('#requestClaimsbox').empty();
-         for (var i = 0; i < travelRequestNoArray.length; i++) {
-
-             var stateArr = new Array();
-             stateArr = travelRequestNoArray[i];
-             var travel_no_tr = stateArr.tr_no;
-             var travel_title_tr = stateArr.tr_title;
-             var from_tr = stateArr.from;
-             var to_tr = stateArr.to;
-             var iternary_id_tr = stateArr.iternary;
-
-             try {
-
-                 var request = "<li id = 'tripTravelId_" + i + "' onclick ='fetchTicketPreferences(" + i + "," + iternary_id_tr + ")'>" + "<div class='trippreflist'>" + "<span class='pull-left'>" + "<input class='abc' id='travel_no_tr_" + i + "' type=button value=" + travel_no_tr + " >" + "</span>" + "<div class='pull-left'>" + "<table class='uptripstxttable'>" + "<tr><td colspan='4'><input class='sltpreftrip' id='travel_title_tr_" + i + "' readonly='true' value= \"" + travel_title_tr + "\"></td></tr>" + "<tr><td>From: </td><td><input class='fligtprefdate' id='from_tr_" + i + "' readonly='true' value=" + from_tr + "></td><td>To: </td><td><input class='fligtprefdate' id='to_tr_" + i + "' readonly='true' value=" + to_tr + "></td></tr>" + "</div>" + "</div>" + "</li>";
-
-             } catch (e) {
-                 alert("exception in dynamic page : " + e);
-             }
-
-             j('#requestClaimsbox').append(request);
-         }
-     } else {
-         document.getElementById('tabNoPreferences').style.display = '';
-     }
- }
-
- var divIdForRequestNos;
- var jsonForTicketOptions = new Object();
-
- function fetchTicketPreferences(i, iternary_id) {
-
-     document.getElementById('firstDiv').style.display = 'none';
-     document.getElementById('flightdet').style.display = '';
-     document.getElementById('tabFlight1').style.display = '';
-     divIdForRequestNos = document.getElementById('tripTravelId_' + i);
-
-     jsonForTicketOptions["iternary_id"] = iternary_id;
-     ajaxCallForTicketOptions(jsonForTicketOptions);
-
- }
-
- function ajaxCallForTicketOptions(jsonForTicketOptions) {
-     urlPath = window.localStorage.getItem("urlPath");
-     j.ajax({
-         url: urlPath + "FetchTicketOptions",
-         type: 'POST',
-         dataType: 'json',
-         crossDomain: true,
-         data: JSON.stringify(jsonForTicketOptions),
-         success: function(data) {
-
-             if (data.Status == "Success") {
-                 var TravelFlightOptions = data.TravelFlightOptions;
-                 showFlightOptions(TravelFlightOptions);
-             }
-
-         },
-         error: function(data) {
-             alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-         }
-     });
-
- }
-
- var flightpreferencesArrayNew = new Array();
-
- function showFlightOptions(TravelFlightOptions) {
-
-     flightpreferencesArrayNew = TravelFlightOptions;
-     if (TravelFlightOptions != null && TravelFlightOptions.length > 0) {
-         j('#flightpreferences').empty();
-         for (var i = 0; i < TravelFlightOptions.length; i++) {
-             var stateArr = new Array();
-             stateArr = TravelFlightOptions[i];
-
-             var optionId = stateArr.ticketOptionsId;
-             var from_pre = stateArr.from;
-             var to_pre = stateArr.to;
-             var from_date_pre = stateArr.from_date;
-             var to_date_pre = stateArr.to_date;
-             var carrier_name_pre = stateArr.carrier_name;
-             var amount_pre = stateArr.amount;
-             var category_pre = stateArr.category;
-             try {
-                 var options = "<li class='airplan'>" + "<div class='trippreflist'>" + "<input  id='optionId_" + i + "' value=" + optionId + "  style='display:none;'>" + "<span class='pull-left tripreficon'><input id ='bookingPriority_" + i + "' type='text' value='0' class='selectpreftxt' onkeyUp='validateBookingPriority(" + i + ");' onclick='changeValue(" + i + ");' ></span>" + "<div class='pull-left triprefblock'>" + "<table class='uptripstxttable'>" + "<tr><td>From: </td><td><input class='uptripstxtfld' id='from_pre_" + i + "' readonly='true' value=" + from_pre + "></td><td>To: </td><td><input class='uptripstxtfld' id='to_pre_" + i + "'  readonly='true' value=" + to_pre + "></td></tr>" + "<tr><td>From: </td><td><input class='uptripstxtfld' id='from_date_pre_" + i + "' readonly='true' value=" + from_date_pre + "></td><td>To: </td><td><input class='uptripstxtfld' id='to_date_" + i + "'  readonly='true' value=" + to_date_pre + "></td></tr>" + "<tr><td class='carriarnametd'>Carrier Name: </td><td><input class='uptripstxtfld' id='carrier_name_pre_" + i + "' readonly='true' value=\"" + carrier_name_pre + "\"></td><td class='carriarnametd'>Amount: </td><td><input class='uptripstxtfld' id='amount_pre_" + i + "' readonly='true' value=" + amount_pre + "></td></tr>" + "<tr><td>Category: </td><td><input class='uptripstxtfld' id='category_pre_" + i + "' readonly='true' value=" + category_pre + "></td><td>&nbsp;</td><td>&nbsp;</td></tr>" + "</table>" + "</div>" + "</div>" + "</li>";
-
-             } catch (e) {
-                 alert("exception in dynamic page : " + e);
-             }
-             j('#flightpreferences').append(options);
-         }
-
-     }
- }
-
- function changeValue(i) {
-     var valueCheck = document.getElementById("bookingPriority_" + i).value
-     if (valueCheck == 0) {
-         document.getElementById("bookingPriority_" + i).value = '';
-     }
-
- }
-
- function populatePriority() {
-     var preferencesJSONNew = [];
-     var preferencesJSON = new Object();
-     var jsonForPreferences = new Object();
-     var len = flightpreferencesArrayNew.length;
-     var bookingString = '';
-
-     for (var i = 0; i < len; i++) {
-         var bookingNo = document.getElementById("bookingPriority_" + i).value;
-         var optionId = document.getElementById("optionId_" + i).value;
-
-         if (validatePriority(bookingNo, len, i)) {
-             bookingString = bookingString + optionId + "-" + bookingNo;
-
-             if (i == flightpreferencesArrayNew.length - 1) {
-                 bookingString = bookingString;
-             } else {
-                 bookingString = bookingString + ",";
-             }
-         } else {
-             return false;
-         }
-
-     }
-     preferencesJSON["details"] = bookingString;
-
-     preferencesJSON["iternary_id_update"] = jsonForTicketOptions["iternary_id"];
-     ajaxForSettingPriority(preferencesJSON);
-
- }
-
- var priorityCount = 0;
- var checkNewArray = new Array();
-
- function validatePriority(bookingNo, len, n) {
-
-     if (bookingNo == '' || bookingNo == 0) {
-         alert("Please fill the Booking Priority.");
-         checkNewArray.length = 0;
-         return false;
-
-     } else if (bookingNo < 0 || bookingNo > len) {
-         alert("The Booking Priority must be between 1 and total number of options.");
-         checkNewArray.length = 0;
-         return false;
-
-     }
-
-     if (checkNewArray.includes(bookingNo)) {
-         alert('Priority should be unique.');
-         checkNewArray.length = 0;
-
-         return false;
-     }
-
-     checkNewArray[n] = bookingNo;
-
-     return true;
- }
-
- function ajaxForSettingPriority(jsonForPreferences) {
-     urlPath = window.localStorage.getItem("urlPath");
-     j.ajax({
-         url: urlPath + "SetBookingPriority",
-         type: 'POST',
-         dataType: 'json',
-         crossDomain: true,
-         data: JSON.stringify(jsonForPreferences),
-         success: function(data) {
-
-             if (data.Status == "Success") {
-
-                 divIdForRequestNos.remove();
-                 document.getElementById('flightdet').style.display = 'none';
-                 document.getElementById('tabSuccess').style.display = '';
-                 checkNewArray.length = 0;
-
-             }
-         },
-
-         error: function(data) {
-             alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
-         }
-     });
-
- }
-
- function validateBookingPriority(i) {
-
-     var bookingPriorityValue = document.getElementById("bookingPriority_" + i).value;
-     if (isNumericForDetailQty(bookingPriorityValue, "Booking Priority") == false) {
-         document.getElementById("bookingPriority_" + i).value = "";
-         return false;
-     }
-
- }
-
- function isNumericForDetailQty(objectValue, messageContent) {
-
-     if (isNaN(objectValue)) {
-         alert(messageContent + " should be numeric.");
-         objectValue.value = "";
-         return false;
-     } else if ((objectValue).indexOf('-') != -1) {
-         alert(messageContent + "should not be negative.");
-         objectValue.value = "";
-         return false;
-     } else if ((objectValue).indexOf(' ') != -1) {
-         alert(messageContent + "should not contain space.");
-         objectValue.value = "";
-         return false;
-     } else if ((objectValue).indexOf('.') != -1) {
-         alert(messageContent + "should not be fractional.");
-         objectValue.value = "";
-         return false;
-     } else {
-         return true;
-     }
- }
-
- // *********************************  Upcoming Trips  -- End *******************************************//
-
- // *********************************   LogOut -- Start ************************************************//
-
- function logOut() {
-
-     var msg = "Please sync your pending expenses before you exit or they will be lost";
-
-     var entitlementMsg = confirm(msg);
-
-     if (entitlementMsg) {
-         deleteLocalDatabase();
-     } else {
-         closeNav();
-     }
- }
-
- function deleteLocalDatabase() {
-     try {
-         localStorage.clear();
-
-         if (mydb) {
-             mydb.transaction(function(t) {
-                 t.executeSql("delete from currencyMst");
-                 t.executeSql("delete from accountHeadMst");
-                 t.executeSql("delete from expNameMst");
-                 t.executeSql("delete from businessExpDetails");
-                 t.executeSql("delete from walletMst");
-                 t.executeSql("delete from travelModeMst");
-                 t.executeSql("delete from travelCategoryMst");
-                 t.executeSql("delete from cityTownMst");
-                 t.executeSql("delete from travelTypeMst");
-                 t.executeSql("delete from travelAccountHeadMst");
-                 t.executeSql("delete from travelExpenseNameMst");
-                 t.executeSql("delete from travelSettleExpDetails");
-                 t.executeSql("delete from travelRequestDetails");
-                 t.executeSql("delete from accountHeadEAMst");
-                 t.executeSql("delete from advanceType");
-                 t.executeSql("delete from employeeAdvanceDetails");
-                 t.executeSql("delete from currencyConversionMst");
-                 t.executeSql("delete from smsMaster");
-                 t.executeSql("delete from smsScrutinizerMst");
-                 t.executeSql("delete from profileMst");
-             });
-         }
-
-         location.reload(true);
-
-         setTimeout(function() {
-             init();
-         }, 200);
-
-     } catch (e) {
-         alert(e);
-     }
- }
-
- function defaultPage() {
-     location.reload(true);
-     setTimeout(function() {
-         init();
-     }, 200);
- }
- // *********************************   LogOut -- End ************************************************//
-
- // *********************************   Profile Page -- Start ************************************************//
-
- function showProfile() {
-     var headerBackBtn = defaultPagePath + 'backbtnPage.html';
-     var pageRef = defaultPagePath + 'profilePage.html';
-     j(document).ready(function() {
-         j('#mainHeader').load(headerBackBtn);
-         j('#mainContainer').load(pageRef);
-     });
-     appPageHistory.push(pageRef);
- }
- // *********************************   Profile Page -- Start ************************************************//
-
- // *********************************   About Page -- Start ************************************************//
-
- function showAboutPage() {
-     var headerBackBtn = defaultPagePath + 'backbtnPage.html';
-     var pageRef = defaultPagePath + 'aboutPage.html';
-     j(document).ready(function() {
-         j('#mainHeader').load(headerBackBtn);
-         j('#mainContainer').load(pageRef);
-     });
-     appPageHistory.push(pageRef);
- }
- // *********************************   About Page -- Start ************************************************//
-
- // *********************************  Business Expense Edit  -- Start ******************************************//
-
- function onloadExpenseElement() {
-    var jsonFindBEEditValues = JSON.parse(window.localStorage.getItem("jsonFindBE"));
-    var accHeadId = jsonFindBEEditValues.accountHeadId;
-
-     if (mydb) {
-         mydb.transaction(function(t) {
-             t.executeSql("SELECT * FROM accountHeadMst", [], getAccHeadListForBEEdit);
-             t.executeSql("SELECT * FROM currencyMst", [], getCurrencyListForBEEdit);
-             t.executeSql("SELECT * FROM expNameMst  where accHeadId=" +accHeadId, [], getExpNameListForBEEdit);
-         });
-     } else {
-         alert('Database not found, your browser does not support web sql!');
-     }
-
- }
-
- function getAccHeadListForBEEdit(transaction, results) {
-     var i;
-     var jsonAccHeadArr = [];
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindAccHead = new Object();
-         jsonFindAccHead["Label"] = row.accountHeadId;
-         jsonFindAccHead["Value"] = row.accHeadName;
-         jsonAccHeadArr.push(jsonFindAccHead);
-     }
-     createAccHeadDropDownForBEEdit(jsonAccHeadArr);
- }
-
- function createAccHeadDropDownForBEEdit(jsonAccHeadArr) {
-     var jsonArr = [];
-
-     if (jsonAccHeadArr != null && jsonAccHeadArr.length > 0) {
-         for (var i = 0; i < jsonAccHeadArr.length; i++) {
-             var stateArr = new Array();
-             stateArr = jsonAccHeadArr[i];
-             jsonArr.push({
-                 id: stateArr.Label,
-                 name: stateArr.Value
-             });
-         }
-     }
-     jsonArr.sort(function(a, b) { // sort object by Account Head Name
-         var nameA = a.name.toLowerCase(),
-             nameB = b.name.toLowerCase()
-         if (nameA < nameB) //sort string ascending
-             return -1
-         if (nameA > nameB)
-             return 1
-         return 0 //default return value (no sorting)
-     })
-     j("#accountHead").select2({
-         data: {
-             results: jsonArr,
-             text: 'name'
-         },
-         minimumResultsForSearch: -1,
-         placeholder: 'Select Account Head',
-         /*initSelection: function (element, callback) {
-            callback(jsonArr[1]);
-            getExpenseNamesBasedOnAccountHead(jsonArr[1]);
-         },*/
-         formatResult: function(result) {
-             if (!isJsonString(result.id))
-                 result.id = JSON.stringify(result.id);
-             return result.name;
-         }
-     });
-
- }
-
- function getCurrencyListForBEEdit(transaction, results) {
-     var i;
-     var jsonCurrencyArr = [];
-
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindCurrHead = new Object();
-         jsonFindCurrHead["Value"] = row.currencyId;
-         jsonFindCurrHead["Label"] = row.currencyName;
-
-         jsonCurrencyArr.push(jsonFindCurrHead);
-     }
-     createCurrencyDropDownForBEEdit(jsonCurrencyArr)
- }
-
- function createCurrencyDropDownForBEEdit(jsonCurrencyArr) {
-     var jsonArr = [];
-     if (jsonCurrencyArr != null && jsonCurrencyArr.length > 0) {
-         for (var i = 0; i < jsonCurrencyArr.length; i++) {
-             var stateArr = new Array();
-             stateArr = jsonCurrencyArr[i];
-
-             jsonArr.push({
-                 id: stateArr.Value,
-                 name: stateArr.Label
-             });
-         }
-     }
-
-     j("#currency").select2({
-         data: {
-             results: jsonArr,
-             text: 'name'
-         },
-         minimumResultsForSearch: -1,
-         placeholder: "Currency",
-         /*initSelection: function (element, callback) {
-                    callback(jsonArr[0]);
-         },*/
-         formatResult: function(result) {
-             if (!isJsonString(result.id))
-                 result.id = JSON.stringify(result.id);
-             return result.name;
-         }
-     }).select2("val", "");
- }
-
- function getExpNameListForBEEdit(transaction, results) {
-     var i;
-     var jsonExpNameArr = [];
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindExpNameHead = new Object();
-         jsonFindExpNameHead["ExpenseID"] = row.id;
-         jsonFindExpNameHead["ExpenseName"] = row.expName;
-         jsonExpNameArr.push(jsonFindExpNameHead);
-     }
-     createExpNameDropDownForBEEdit(jsonExpNameArr);
-
-
-     setEditBEJSON();
-
-
- }
-
- function createExpNameDropDownForBEEdit(jsonExpNameArr) {
-     var jsonExpArr = [];
-     if (jsonExpNameArr != null && jsonExpNameArr.length > 0) {
-         for (var i = 0; i < jsonExpNameArr.length; i++) {
-             var stateArr = new Array();
-             stateArr = jsonExpNameArr[i];
-             jsonExpArr.push({
-                 id: stateArr.ExpenseID,
-                 name: stateArr.ExpenseName
-             });
-         }
-     }
-
-     j("#expenseName").select2({
-         data: {
-             results: jsonExpArr,
-             text: 'name'
-         },
-         minimumResultsForSearch: -1,
-         placeholder: "Select Expense Name",
-         /*initSelection: function (element, callback) {
-            callback(jsonExpArr[0]);
-         },*/
-         formatResult: function(result) {
-             if (!isJsonString(result.id))
-                 result.id = JSON.stringify(result.id);
-             return result.name;
-         }
-     }).select2("val", "");
-
- }
-
- function setEditBEJSON() {
-
-     var jsonFindBEEditValues = JSON.parse(window.localStorage.getItem("jsonFindBE"));
-
-     document.getElementById("expNarration").value = jsonFindBEEditValues.narration;
-
-     document.getElementById("expDate").value = jsonFindBEEditValues.expenseDate;
-
-     document.getElementById("busExpDetailId").value = jsonFindBEEditValues.busExpDetailId;
-
-     j("#accountHead").select2("val", jsonFindBEEditValues.accountHeadId);
-
-     if (jsonFindBEEditValues.units != null) {
-         document.getElementById("expUnit").value = jsonFindBEEditValues.units;
-     }
-
- /*    if (document.getElementById("expUnit").value == 'undefined') {
-         document.getElementById("expUnit").value = "";
-         document.getElementById("expUnit").style.display = "none";
-     }*/
-
-     document.getElementById("expAmt").value = jsonFindBEEditValues.amount;
-
-     j("#expenseName").select2("val", jsonFindBEEditValues.expenseId);
-
-     j("#currency").select2("val", jsonFindBEEditValues.currencyId);
-
-     document.getElementById("expFromLoc").value = jsonFindBEEditValues.fromLocation;
-
-     document.getElementById("expToLoc").value = jsonFindBEEditValues.toLocation;
-
-     getPerUnitFromDBForEdit(jsonFindBEEditValues.expenseId);
-
-        if(jsonFindBEEditValues.imageAttach != "" && jsonFindBEEditValues.imageAttach != null)
-        {
-               smallImageBE.style.display = 'block';
-               smallImageBE.src =  jsonFindBEEditValues.imageAttach;
-
-               if(fileTempCameraBE != "" && fileTempCameraBE != null){
-                    fileTempCameraBE =  jsonFindBEEditValues.imageAttach;
-               }else{
-                    fileTempGalleryBE =  jsonFindBEEditValues.imageAttach;
-               }
+var j = jQuery.noConflict();
+var defaultPagePath = 'app/pages/';
+var headerMsg = "Expenzing";
+//var urlPath = 'http://1.255.255.36:13130/TnEV1_0AWeb/WebService/Login/'
+//var WebServicePath ='http://1.255.255.99:8681/NexstepWebService/mobileLinkResolver.service';
+//var WebServicePath = 'http://live.nexstepapps.com:8284/NexstepWebService/mobileLinkResolver.service';
+//var WebServicePath ='http://1.255.255.95:8080/NexstepWebService/mobileLinkResolver.service';
+var WebServicePath = 'http://1.255.255.98:8083/NexstepWebService/mobileLinkResolver.service';
+var clickedFlagCar = false;
+var clickedFlagTicket = false;
+var clickedFlagHotel = false;
+var clickedCarRound = false;
+var clickedTicketRound = false;
+var clickedHotelRound = false;
+var perUnitDetailsJSON = new Object();
+var ismodeCategoryJSON = new Object();
+var exceptionStatus = 'N';
+var exceptionMessage = '';
+var expenseClaimDates = new Object();
+var successMessage;
+var pictureSource, destinationType;
+var camerastatus;
+var voucherType;
+var fileTempCameraBE = "";
+var fileTempCameraTS = "";
+var fileTempGalleryBE = "";
+var fileTempGalleryTS = "";
+var mapToCalcERAmt = new Map();
+var requestRunning = false;
+var flagForUnitEnable = false;
+var smsList = [];
+var smsBodyString = "";
+var smsToExpenseStr = "";
+var smsWatchFlagStatus = false;
+var expensePageFlag = ''; //S for smsExpenses And N for normal expenses
+var filtersStr = "";
+var fromLocationWayPoint = "";
+var toLocationWayPoint = "";
+var profileImg = "";
+var enableDiv = "";  // Temporary for demo purpose
+var updateAttachment = ""; // For BE Edit
+
+j(document).ready(function() {
+    document.addEventListener("deviceready", loaded, false);
+});
+
+function login() {
+    if (document.getElementById("userName") != null) {
+        var userName = document.getElementById("userName");
+    } else if (document.getElementById("userName") != null) {
+        var userName = document.getElementById("userNameId");
+    }
+    var password = document.getElementById("pass");
+
+    var jsonToBeSend = new Object();
+    jsonToBeSend["user"] = userName.value;
+    jsonToBeSend["pass"] = password.value;
+    //setUrlPathLocalStorage(urlPath);
+    urlPath = window.localStorage.getItem("urlPath");
+    j('#loading').show();
+    j.ajax({
+        url: urlPath + "LoginWebService",
+        type: 'POST',
+        dataType: 'json',
+        crossDomain: true,
+        data: JSON.stringify(jsonToBeSend),
+        success: function(data) {
+            if (data.Status == 'Success') {
+                if (data.hasOwnProperty('multiLangInMobile') && data.multiLangInMobile != null &&
+                    data.multiLangInMobile) {
+                    var headerBackBtn = defaultPagePath + 'withoutBckBtn.html';
+                    var pageRef = defaultPagePath + 'language.html';
+                    j('#mainHeader').load(headerBackBtn);
+                    j('#mainContainer').load(pageRef);
+                    appPageHistory.push(pageRef);
+                    setUserStatusInLocalStorage("Valid");
+                    setUserSessionDetails(data, jsonToBeSend);
+                    j('#loading').hide();
+                } else {
+                    var headerBackBtn = defaultPagePath + 'categoryMsgPage.html';
+                    var pageRef = defaultPagePath + 'category.html';
+                    j('#mainHeader').load(headerBackBtn);
+                    j('#mainContainer').load(pageRef);
+                    appPageHistory.push(pageRef);
+                    //addEmployeeDetails(data);
+
+                    setUserStatusInLocalStorage("Valid");
+                    setUserSessionDetails(data, jsonToBeSend);
+
+                    if (data.hasOwnProperty('EaInMobile') &&
+                        data.EaInMobile != null) {
+                        if (data.EaInMobile) {
+                            synchronizeEAMasterData();
+                        }
+                    }
+
+                    if (data.TrRole) {
+                        synchronizeTRMasterData();
+                        synchronizeTRForTS();
+                    }
+                    synchronizeBEMasterData();
+
+                    if (data.hasOwnProperty('smartClaimsViaSMSOnMobile') &&
+                        data.smartClaimsViaSMSOnMobile != null) {
+                        if (data.EaInMobile) {
+                            synchronizeWhiteListMasterData();
+                            startWatch();
+                        }
+                    }
+
+                }
+
+            } else if (data.Status == 'Failure') {
+                successMessage = data.Message;
+                if (successMessage.length == 0) {
+                    successMessage = "Wrong UserName or Password";
+                }
+                document.getElementById("loginErrorMsg").innerHTML = successMessage;
+                j('#loginErrorMsg').hide().fadeIn('slow').delay(2000).fadeOut('slow');
+                j('#loading').hide();
+            } else {
+                j('#loading').hide();
+                alert(window.lang.translate('Please enter correct username or password'));
+            }
+
+        },
+        error: function(data) {
+            j('#loading').hide();
         }
- 
- }
-
-  function getPerUnitFromDBForEdit(expenseNameID) {
-     j('#errorMsgArea').children('span').text("");
-     if (mydb) {
-         //Get all the employeeDetails from the database with a select statement, set outputEmployeeDetails as the callback function for the executeSql command
-         mydb.transaction(function(t) {
-             t.executeSql("SELECT * FROM expNameMst where id=" + expenseNameID, [], setPerUnitDetailsForEdit);
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function updateBusinessDetails(busExpDetailId) {
-
-     var acc_head_id;
-     var acc_head_val;
-
-     var exp_name_id;
-     var exp_name_val;
-
-     var currency_id;
-     var currency_val;
-
-     var file;
-
-     var busExpDetailId = busExpDetailId.value;
-
-     if (j("#accountHead").select2('data') != null) {
-         acc_head_id = j("#accountHead").select2('data').id;
-         acc_head_val = j("#accountHead").select2('data').name;
-     } else {
-         acc_head_id = '-1';
-     }
-
-     if (j("#expenseName").select2('data') != null) {
-         exp_name_id = j("#expenseName").select2('data').id;
-         exp_name_val = j("#expenseName").select2('data').name;
-     } else {
-         exp_name_id = '-1';
-     }
-
-     if (j("#currency").select2('data') != null) {
-         currency_id = j("#currency").select2('data').id;
-         currency_val = j("#currency").select2('data').name;
-     } else {
-         currency_id = '-1';
-     }
-
-     var exp_date = document.getElementById('expDate').value;
-
-     var exp_from_loc = document.getElementById('expFromLoc').value;
-
-     var exp_to_loc = document.getElementById('expToLoc').value;
-
-     var exp_narration = document.getElementById('expNarration').value;
-
-     var exp_unit = document.getElementById('expUnit').value;
-
-     var exp_amt = document.getElementById('expAmt').value;
-
-     alert("fileTempGalleryBE : "+fileTempGalleryBE);
-     alert("fileTempCameraBE : "+fileTempCameraBE);
-
-/*     if (fileTempGalleryBE == undefined || fileTempGalleryBE == "") {
-            file = fileTempGalleryBE;
-     } else if(fileTempGalleryBE != ""){
-        alert("in else gal ");
-         file = fileTempGalleryBE;
-     }
-
-     if (fileTempCameraBE == undefined || fileTempCameraBE == "") {
-            file = fileTempCameraBE;
-     } else if(fileTempCameraBE != ""){
-        alert("in else cam ");
-         file = fileTempCameraBE;
-     }*/
-
-     if(fileTempCameraBE != ""){
-        alert("in else cam ");
-        file = fileTempCameraBE;
-     }
-
-     if (file == undefined) {
-        alert("in fle undefned");
-         file = "";
-     }
-
-      if (validateExpenseDetails(exp_date, exp_from_loc, exp_to_loc, exp_narration, exp_unit, exp_amt, acc_head_id, exp_name_id, currency_id, file)) {
-
-     if (mydb) {
-         mydb.transaction(function(t) {
-             console.log("accHeadId =" + acc_head_id)
-             console.log("expNameId =" + exp_name_id)
-             console.log("expDate =" + expDate)
-             console.log("fromLocation =" + exp_from_loc)
-             console.log("toLocation =" + exp_to_loc)
-             console.log("expNarration =" + exp_narration)
-             console.log("expUnit =" + exp_unit)
-             console.log("expAmt =" + exp_amt)
-             console.log("currencyId =" + currency_id)
-             console.log("busExpDetailId =" + busExpDetailId)
-
-             t.executeSql("UPDATE businessExpDetails set accHeadId ='" + acc_head_id + "', expNameId ='" + exp_name_id + "',expDate = '" + exp_date + "'   ,expFromLoc = '" + exp_from_loc + "'   ,expToLoc = '" + exp_to_loc + "'    ,expUnit = '" + exp_unit + "'   , expAmt = '" + exp_amt + "'   ,    expNarration = '" + exp_narration + "' ,currencyId = '" + currency_id + "' ,busExpAttachment = '" + file + "' where busExpId = " + busExpDetailId + ";");
-         });
-
-         alert("Record update successfully");
-
-     } else {
-         alert("db not found, your browser does not support web sql!");
-     }
-     viewBusinessExp();
-
-      }
- }
-
- function getPrimaryExpenseId(expMstId) {
-     if (mydb) {
-         //Get all the employeeDetails from the database with a select statement, set outputEmployeeDetails as the callback function for the executeSql command
-         mydb.transaction(function(t) {
-             t.executeSql("SELECT id FROM expNameMst where expNameMstId=" + expMstId, [], getExpId);
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
-
- }
-
- function getExpId(transaction, results) {
-     var i;
-     var jsonFindExpNameHead = new Object();
-
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-
-         jsonFindExpNameHead["ExpenseID"] = row.id;
-
-         editBusiExpMain(row.id);
-
-     }
-
- }
- // *********************************  Business Expense Edit  -- End ******************************************//
-
- // *********************************  Travel Last Min Trip Validation -- Start ******************************************//
-
- function checkLastMinTrip() {
-     var current_Date = new Date();
-     current_Date.setHours(0, 0, 0, 0);
-
-     var selected_Date = $("#selectDate_One").datepicker("getDate");
-
-     // get days
-     var days = (current_Date - selected_Date) / (1000 * 60 * 60 * 24);
-
-     getDelayDays(days);
-
- }
-
- function checkLastMinRoundTrip() {
-     var current_Date = new Date();
-     current_Date.setHours(0, 0, 0, 0);
-
-     var selected_Date = $("#selectDate_Three").datepicker("getDate");
-
-     // get days
-     var days = (current_Date - selected_Date) / (1000 * 60 * 60 * 24);
-
-     getDelayDays(days);
-
- }
-
- function getDelayDays(days) {
-     var i;
-     var noOfDays;
-     var daysDiff = days;
-     var expMsg = "";
-
-     if (mydb) {
-         mydb.transaction(function(t) {
-             t.executeSql('Select noOfDays from delayMst where processId = 3 and moduleId = 2', [],
-                 function(transaction, results) {
-                     for (i = 0; i < results.rows.length; i++) {
-                         var row = results.rows.item(i);
-                         noOfDays = row.noOfDays;
-
-                         if (daysDiff <= noOfDays && daysDiff > -7) {
-
-                             j('#validationMsgBox').show();
-                             j('#validationMsgBoxRoundTrip').show();
-
-                             expMsg = "This is last minute trip request! You have crossed the time limit of " + noOfDays + " days for trip request.";
-
-                             document.getElementById("delayDaysMsgRoundArea").style.display = "";
-                             document.getElementById("delayDaysMsgArea").style.display = "";
-
-                             j('#delayDaysMsgArea').children('span').text(expMsg);
-                             j('#delayDaysMsgRoundArea').children('span').text(expMsg);
-
-                             document.getElementById("selectDate_One").style.borderColor = "#960e0e";
-                             document.getElementById("selectDate_Three").style.borderColor = "#960e0e";
-
-                         } else {
-                             document.getElementById("selectDate_One").style.borderColor = "#cccccc";
-                             document.getElementById("selectDate_Three").style.borderColor = "#cccccc";
-                             j('#delayDaysMsgArea').children('span').text(expMsg);
-                             j('#delayDaysMsgRoundArea').children('span').text(expMsg);
-                             disableTableRow();
-                         }
-
-                     }
-                 });
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- // *********************************  Travel Last Min Trip Validation -- End ******************************************//
-
- // *********************************  Travel Date For Overlap Validation -- Start ******************************************//
-
- function validateDateForOverlapTravel() {
-     var tvl_date = document.getElementById('selectDate_One').value;
-     var tvl__round_dateOne = document.getElementById('selectDate_Two').value;
-     var tvl__round_dateTwo = document.getElementById('selectDate_Three').value;
-
-     if (validateTravelOverLapDetails()) {
-         var jsonToSaveTR = new Object();
-         jsonToSaveTR["EmployeeId"] = window.localStorage.getItem("EmployeeId");;
-
-         var listItineraryTab = document.getElementById('myTab');
-         if (hasClass(listItineraryTab.children[0], "active")) {
-
-             jsonToSaveTR["DepartDate"] = tvl_date;
-             jsonToSaveTR["ArriveDate"] = tvl_date;
-
-         } else {
-             jsonToSaveTR["ArriveDate"] = tvl__round_dateOne;
-             jsonToSaveTR["DepartDate"] = tvl__round_dateTwo;
-
-         }
-         dateOverLapMsg(jsonToSaveTR);
-     }
- }
-
- function dateOverLapMsg(jsonToSaveTR) {
-     j('#overlapMsgRoundTripArea').children('span').text("");
-     j('#overlapMsgArea').children('span').text("");
-
-     var spanValueErrorMsg1 = document.getElementById('errorMsg1').innerHTML;
-     var spanValueErrorMsg2 = document.getElementById('errorMsg2').innerHTML;
-
-     var spanValueErrorMsg3 = document.getElementById('errorMsg3').innerHTML;
-     var spanValueErrorMsg4 = document.getElementById('errorMsg4').innerHTML;
-
-     j.ajax({
-         url: window.localStorage.getItem("urlPath") + "ValidateTravelVoucherForDateRange",
-         type: 'POST',
-         dataType: 'json',
-         crossDomain: true,
-         data: JSON.stringify(jsonToSaveTR),
-         success: function(data) {
-             if (data.Status == "Y") {
-                 var overlapMsg = data.Message;
-                 if (overlapMsg != "") {
-                     j('#validationMsgBox').show();
-                     j('#validationMsgBoxRoundTrip').show();
-
-                     document.getElementById("selectDate_One").style.borderColor = "#960e0e";
-                     document.getElementById("selectDate_Two").style.borderColor = "#960e0e";
-                     document.getElementById("selectDate_Three").style.borderColor = "#960e0e";
-
-                     j('#overlapMsgArea').children('span').text(overlapMsg);
-                     j('#overlapMsgRoundTripArea').children('span').text(overlapMsg);
-
-                 }
-             } else {
-
-                 if (spanValueErrorMsg1 == "" && spanValueErrorMsg2 == "") {
-                     document.getElementById("selectDate_One").style.borderColor = "#cccccc";
-                 }
-
-                 if (spanValueErrorMsg3 == "") {
-                     document.getElementById("selectDate_Three").style.borderColor = "#cccccc";
-                 }
-
-                 if (spanValueErrorMsg4 == "") {
-                     document.getElementById("selectDate_Two").style.borderColor = "#cccccc";
-
-                 }
-                 j('#overlapMsgArea').children('span').text("");
-                 j('#overlapMsgRoundTripArea').children('span').text("");
-
-                 requestRunning = false;
-             }
-             disableTableRow();
-         },
-         error: function(data) {
-             requestRunning = false;
-         }
-     });
- }
-
- function validateTravelOverLapDetails() {
-     var listItineraryTab = document.getElementById('myTab');
-     if (hasClass(listItineraryTab.children[0], "active")) {
-
-         if (document.getElementById('selectDate_One').value == "Select Date") {
-             alert(window.lang.translate('Travel Date is invalid'));
-             return false;
-         }
-
-     } else {
-
-         if (document.getElementById('selectDate_Two').value == "Select Date") {
-             alert(window.lang.translate('Travel Date is invalid'));
-             return false;
-         }
-         if (document.getElementById('selectDate_Three').value == "Select Date") {
-             alert(window.lang.translate('Travel Date is invalid'));
-             return false;
-         }
-
-     }
-     return true;
- }
-
- function disableTableRow() {
-     var spanValueErrorMsg1 = document.getElementById('errorMsg1').innerHTML;
-     var spanValueErrorMsg2 = document.getElementById('errorMsg2').innerHTML;
-
-     var spanValueErrorMsg3 = document.getElementById('errorMsg3').innerHTML;
-     var spanValueErrorMsg4 = document.getElementById('errorMsg4').innerHTML;
-
-     if (spanValueErrorMsg1 == "") {
-         document.getElementById("delayDaysMsgArea").style.display = "none";
-     }
-
-     if (spanValueErrorMsg3 == "") {
-         document.getElementById("delayDaysMsgRoundArea").style.display = "none";
-     }
-
-     if (spanValueErrorMsg3 == "" && spanValueErrorMsg4 == "") {
-         j("#validationMsgBoxRoundTrip").hide();
-     }
-
-     if (spanValueErrorMsg1 == "" && spanValueErrorMsg2 == "") {
-         j("#validationMsgBox").hide();
-     }
- }
-
- // *********************************  Travel Date For Overlap Validation -- End ******************************************//
-
- // *********************************  Travel Settelment Advance Amount -- Start ******************************************//
-
- function getAdvanceAmountOnChange() {
-
-     var travelRequestId = j("#travelRequestName").select2('data').id;
-     getAdvanceAmountfromDBTravel(travelRequestId);
- }
-
- function getAdvanceAmountfromDBTravel(travelRequestId) {
-     if (mydb) {
-         mydb.transaction(function(t) {
-             var result = t.executeSql("select advanceRequested,advanceAmount from travelRequestDetails where travelRequestId=" + travelRequestId, [], fetchTravelAdvanceDetails);
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
- }
-
- function fetchTravelAdvanceDetails(transaction, results) {
-     var i;
-     var jsonExpenseNameArr = [];
-     for (i = 0; i < results.rows.length; i++) {
-         var row = results.rows.item(i);
-         var jsonFindTravelType = new Object();
-         var advReq = row.advanceRequested;
-         var advAmt = row.advanceAmount;
-
-         if (advReq == "Y") {
-             j('#advanceTxtArea').show();
-             document.getElementById('advAmt').value = advAmt;
-         } else {
-             j('#advanceTxtArea').hide();
-         }
-     }
- }
-
- // *********************************  Travel Settelment Advance Amount -- End ******************************************//
-
- // *********************************  Travel Settelment Entitlement -- Start ******************************************//
- function checkEntitlementForTravelSettelment() {
-     var travelExpenseReqID;
-     var travelModeID;
-     var travelCategoryID;
-     var cityTownID;
-     var cityTownName;
-     var travelReqID;
-     var travelExpenseReqName;
-
-     if (j("#travelRequestName").select2('data') != null) {
-         travelReqID = j("#travelRequestName").select2('data').id;
-     }
-     if (j("#travelModeForTS").select2('data') != null) {
-         travelModeID = j("#travelModeForTS").select2('data').id;
-     }
-     if (j("#travelCategoryForTS").select2('data') != null) {
-         travelCategoryID = j("#travelCategoryForTS").select2('data').id;
-     }
-     if (j("#Citytown").select2('data') != null) {
-         cityTownID = j("#Citytown").select2('data').id;
-         cityTownName = j("#Citytown").select2('data').name;
-     }
-     if (j("#travelExpenseName").select2('data') != null) {
-         travelExpenseReqID = j("#travelExpenseName").select2('data').id;
-         travelExpenseReqName = j("#travelExpenseName").select2('data').name;
-     }
-
-     if (travelReqID != 'undefined' && travelReqID != '-1') {
-         getExpenseIdForTravelFromDB(travelReqID, travelModeID, travelCategoryID, cityTownID, travelExpenseReqID, cityTownName, travelExpenseReqName);
-     }
- }
-
- function getExpenseIdForTravelFromDB(travelReqID, travelModeID, travelCategoryID, cityTownID, travelExpenseReqID, cityTownName, travelExpenseReqName) {
-
-     if (mydb) {
-         mydb.transaction(function(t) {
-             t.executeSql("SELECT expenseNameId FROM travelExpenseNameMst where id=" + travelExpenseReqID, [],
-                 function(transaction, results) {
-
-                     for (i = 0; i < results.rows.length; i++) {
-
-                         var row = results.rows.item(i);
-                         var expenseNameId = row.expenseNameId;
-
-                         if (expenseNameId != "" && expenseNameId != 0) {
-                             calcuteEntitlementForTS(expenseNameId, travelReqID, travelExpenseReqID, travelModeID, travelCategoryID, cityTownID, cityTownName, travelExpenseReqName);
-                         }
-
-                     }
-                 });
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
-
- }
-
- function calcuteEntitlementForTS(expenseNameId, travelReqID, travelExpenseReqID, travelModeID, travelCategoryID, cityTownID, cityTownName, travelExpenseReqName) {
-
-     console.log("travelExpenseNameID : " + expenseNameId + "cityTownID : " + cityTownID);
-
-     if (validateValuesForEntitlement(travelReqID, travelModeID, travelCategoryID, cityTownID, travelExpenseReqID)) {
-         if (mydb) {
-             mydb.transaction(function(t) {
-                 t.executeSql("Select amount from perDiemTravelMst where domCityTownId = '" + cityTownID + "' and expenseHeadId ='" + expenseNameId + "'", [],
-                     function(transaction, results) {
-                         for (i = 0; i < results.rows.length; i++) {
-
-                             var row = results.rows.item(i);
-                             var amount = row.amount;
-                             var tsAmount = document.getElementById('expAmt').value;
-                             var exceptionMessage = "";
-
-                             if (tsAmount > amount) {
-                                 exceptionMessage = "(Exceeding Per Diem Entitlement amount defined: " + amount + " for Expense Head :  " + travelExpenseReqName + " and City/Town : " + cityTownName + ")";
-                                 j('#travelErrorMsgArea').children('span').text(exceptionMessage);
-                             } else {
-                                 j('#travelErrorMsgArea').children('span').text(exceptionMessage);
-                             }
-
-                         }
-                     });
-             });
-         } else {
-             alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-         }
-     }
- }
-
- function validateValuesForEntitlement(travelReqID, cityTownID, travelExpenseReqID) {
-     if (travelReqID != "-1" && cityTownID != "-1" && travelExpenseReqID != "-1") {
-         return true;
-     } else {
-         return false;
-     }
- }
-
- function resetAmountAndEntitlementMsg() {
-     document.getElementById('expAmt').value = "";
-     j('#travelErrorMsgArea').children('span').text('');
- }
-
- // *********************************  Travel Settelment Entitlement -- End ******************************************//
-
- // *********************************  Travel Settelment Send For Appoval -- Start ******************************************//
- function tripDetails() {
-     var travelRequestId = j("#travelRequestName").select2('data').id;
-     alert("travelRequestId : " + travelRequestId);
-     var jsonToPopulateTRDetails = new Object();
-     jsonToPopulateTRDetails["TravelRequestId"] = travelRequestId;
-     checkTRDetailsExist(travelRequestId, jsonToPopulateTRDetails);
- }
-
- function checkTRDetailsExist(travelRequestId, jsonToPopulateTRDetails) {
-     if (mydb) {
-         mydb.transaction(function(t) {
-             t.executeSql("Select * from travelSettleExpDetails where travelRequestId = '" + travelRequestId + "'", [],
-                 function(transaction, results) {
-                     alert("results.rows.length : " + results.rows.length);
-                     var noOfRows = results.rows.length;
-                     if (noOfRows == 0) {
-                         populateTravelRequestDetailsAjax(jsonToPopulateTRDetails);
-                     } else {
-                         return false;
-                     }
-
-                 });
-         });
-     } else {
-         alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-     }
-
- }
-
- function populateTravelRequestDetailsAjax(jsonToPopulateTRDetails) {
-     alert("populateTravelRequestDetailsAjax :");
-     var pageRefSuccess = defaultPagePath + 'success.html';
-     var pageRefFailure = defaultPagePath + 'failure.html';
-
-     j.ajax({
-         url: window.localStorage.getItem("urlPath") + "FetchDetailLinesForTS",
-         type: 'POST',
-         dataType: 'json',
-         crossDomain: true,
-         data: JSON.stringify(jsonToPopulateTRDetails),
-         success: function(data) {
-             if (data.Status == "Success") {
-                 var travelDetailArray = data.TravelDetailArray;
-                 setTRdetailsForSettelment(travelDetailArray);
-
-                 requestRunning = false;
-             } else {
-                 successMessage = "Error: Oops something is wrong, Please Contact System Administer";
-                 requestRunning = false;
-             }
-         },
-         error: function(data) {
-             requestRunning = false;
-         }
-     });
- }
-
- function setTRdetailsForSettelment(travelDetailArray) {
-
-     alert("travel detail : " + JSON.stringify(travelDetailArray));
-     mydb.transaction(function(t) {
-         if (travelDetailArray != null && travelDetailArray.length > 0) {
-             for (var i = 0; i < travelDetailArray.length; i++) {
-                 var detailArr = new Array();
-                 detailArr = travelDetailArray[i];
-                 var exp_date = detailArr.ExpDate;
-                 var travelRequestId = detailArr.TravelReqId;
-                 var exp_name_id = detailArr.ExpNameId;
-                 var exp_narration = detailArr.Narration;
-                 var exp_unit = detailArr.Unit;
-                 var exp_amt = detailArr.Amount;
-                 var currency_id = detailArr.ExpCurrencyId;
-                 var travelMode_id = detailArr.TravelModeId;
-                 var travelCategory_id = detailArr.TravelCatgId;
-                 var cityTown_id = detailArr.CityTownId;
-                 var file = "";
-
-                 t.executeSql("INSERT INTO travelSettleExpDetails  (expDate, travelRequestId,expNameId,expNarration, expUnit,expAmt,currencyId,travelModeId,travelCategoryId,cityTownId,tsExpAttachment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [exp_date, travelRequestId, exp_name_id, exp_narration, exp_unit, exp_amt, currency_id, travelMode_id, travelCategory_id, cityTown_id, file]);
-             }
-         }
-     });
- }
- // *********************************  Travel Settelment Send For Appoval -- End ******************************************//
-
- function getDefaultApprovePage() {
-     var headerBackBtn = defaultPagePath + 'backbtnPage.html';
-     var pageRefSuccess = defaultPagePath + 'success.html';
-     successMessage = "Voucher Approved Successfully";
-
-     j('#mainHeader').load(headerBackBtn);
-     j('#mainContainer').load(pageRefSuccess);
-
- }
-
- //***************************** Profile Image -- Start *******************************************************//
- function findProfileImagedata() {
-
-     try {
-
-         var empId = window.localStorage.getItem("EmployeeId");
-
-         if (mydb) {
-             mydb.transaction(function(t) {
-                 t.executeSql("Select profileAttachment from profileMst where empId = '" + empId + "'", [],
-                     function(transaction, results) {
-                         for (i = 0; i < results.rows.length; i++) {
-
-                             var row = results.rows.item(i);
-
-                             if (row.profileAttachment != "" ) {
-                                 if (document.getElementById("ProfilePreview") != null) {
-                                     document.getElementById("ProfilePreview").src = "data:image/png;base64," + row.profileAttachment;
-                                 }
-                                 if (document.getElementById("sideNavProfilePreview") != null) {
-                                     document.getElementById("sideNavProfilePreview").src = "data:image/png;base64," + row.profileAttachment;
-                                 }
-                             }
-                         }
-
-                     });
-             });
-         } else {
-             alert(window.lang.translate('Database not found, your browser does not support web sql!'));
-         }
-
-     } catch (e) {
-         console.log(e);
-     }
-
- }
-
- //***************************** Profile Image -- End *******************************************************//
+    });
+
+}
+
+function commanLogin() {
+    var userName = document.getElementById("userName");
+    var userNameValue = userName.value;
+    var domainName = userNameValue.split('@')[1];
+    var jsonToDomainNameSend = new Object();
+    jsonToDomainNameSend["userName"] = domainName;
+    //jsonToDomainNameSend["mobilePlatform"] = device.platform;
+    jsonToDomainNameSend["mobilePlatform"] = "Android";
+    jsonToDomainNameSend["appType"] = "NEXGEN_EXPENZING_TNE_APP";
+    //var res=JSON.stringify(jsonToDomainNameSend);
+    var requestPath = WebServicePath;
+    j.ajax({
+        url: requestPath,
+        type: 'POST',
+        contentType: "application/json",
+        dataType: 'json',
+        crossDomain: true,
+        data: JSON.stringify(jsonToDomainNameSend),
+        success: function(data) {
+            if (data.status == 'Success') {
+                urlPath = data.message;
+                setUrlPathLocalStorage(urlPath);
+                login();
+            } else if (data.status == 'Failure') {
+                successMessage = data.message;
+                document.getElementById("loginErrorMsg").innerHTML = successMessage;
+                j('#loginErrorMsg').hide().fadeIn('slow').delay(2000).fadeOut('slow');
+            } else {
+                successMessage = data.message;
+                if (successMessage == "" || successMessage == null) {
+                    alert(window.lang.translate('Please enter correct username or password'));
+                } else {
+                    alert(window.lang.translate(successMessage));
+                }
+            }
+        },
+        error: function(data) {
+
+        }
+    });
+}
+
+function createBusinessExp() {
+    resetImageData();
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    var pageRef = defaultPagePath + 'addAnExpense.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+function displayBusinessExp() {
+
+    var headerBackBtn = defaultPagePath + 'headerPageForBEOperation.html';
+    var pageRef = defaultPagePath + 'fairClaimTable.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+function displayTSExp() {
+
+    var headerBackBtn = defaultPagePath + 'headerPageForTSOperation.html';
+    var pageRef = defaultPagePath + 'travelSettlementTable.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+function cerateTravelReq() {
+
+    var pageRef = defaultPagePath + 'addToTravelRequest.html';
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+function createWallet() {
+
+    var headerBackBtn = defaultPagePath + 'headerPageForWalletOperation.html';
+    var pageRef = defaultPagePath + 'addToWallet.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+function init() {
+    var pgRef;
+    var headerBackBtn;
+    if (window.localStorage.getItem("EmployeeId") != null) {
+        if (window.localStorage.getItem("UserStatus") == 'ResetPswd') {
+            headerBackBtn = defaultPagePath + 'expenzingImagePage.html';
+            pgRef = defaultPagePath + 'loginPageResetPswd.html';
+        } else if (window.localStorage.getItem("UserStatus") == 'Valid') {
+            pgRef = defaultPagePath + 'category.html';
+            headerBackBtn = defaultPagePath + 'categoryMsgPage.html';
+        } else {
+            headerBackBtn = defaultPagePath + 'expenzingImagePage.html';
+            pgRef = defaultPagePath + 'loginPage.html';
+        }
+    } else {
+        headerBackBtn = defaultPagePath + 'expenzingImagePage.html';
+        pgRef = defaultPagePath + 'loginPage.html';
+    }
+
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pgRef);
+        j('#mainContainer').load(pgRef, function() {
+            if (window.localStorage.getItem("UserStatus") != null && window.localStorage.getItem("UserStatus") == 'ResetPswd') {
+                document.getElementById("userName").value = window.localStorage.getItem("UserName");
+            }
+
+        });
+        j('#mainContainer').swipe({
+            swipe: function(event, direction, distance, duration, fingercount) {
+                switch (direction) {
+                    case "right":
+                        goBack();
+                        break;
+                    default:
+
+                }
+            },
+            threshold: 200,
+            allowPageScroll: "auto"
+        });
+    });
+    appPageHistory.push(pgRef);
+}
+
+function loaddate() {
+    j(function() {
+        window.prettyPrint && prettyPrint();
+        j('.dp1').datepicker({
+            format: 'dd-mm-yyyy'
+        });
+    });
+
+    j('.dp1').on('changeDate', function(ev) {
+        j(this).datepicker('hide');
+    });
+
+}
+
+function isJsonString(str) {
+    try {
+        JSON.parse(str);
+    } catch (e) {
+        return false;
+    }
+    return true;
+}
+
+function viewBusinessExp() {
+    var pageRef = defaultPagePath + 'fairClaimTable.html';
+    //var headerBackBtn=defaultPagePath+'headerPageForBEOperation.html';
+    j(document).ready(function() {
+        //j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+    j('#loading_Cat').hide();
+}
+
+function viewTravelSettlementExp() {
+    resetImageData();
+    var pageRef = defaultPagePath + 'travelSettlementTable.html';
+    var headerBackBtn = defaultPagePath + 'headerPageForTSOperation.html';
+    j(document).ready(function() {
+
+        j('#loading_Cat').hide();
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+function saveBusinessExpDetails(jsonBEArr, busExpDetailsArr) {
+    var jsonToSaveBE = new Object();
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    jsonToSaveBE["employeeId"] = window.localStorage.getItem("EmployeeId");;
+    jsonToSaveBE["ProcessStatus"] = "0";
+    jsonToSaveBE["expenseDetails"] = jsonBEArr;
+    requestRunning = true;
+    var pageRefSuccess = defaultPagePath + 'success.html';
+    var pageRefFailure = defaultPagePath + 'failure.html';
+    j('#loading_Cat').show();
+    j.ajax({
+        url: window.localStorage.getItem("urlPath") + "BusExpService",
+        type: 'POST',
+        dataType: 'json',
+        crossDomain: true,
+        data: JSON.stringify(jsonToSaveBE),
+        success: function(data) {
+            if (data.Status == "Success") {
+                successMessage = "Record(s) has been synchronized successfully.";
+                for (var i = 0; i < busExpDetailsArr.length; i++) {
+                    var businessExpDetailId = busExpDetailsArr[i];
+                    deleteSelectedExpDetails(businessExpDetailId);
+                }
+                requestRunning = false;
+                j('#mainHeader').load(headerBackBtn);
+                j('#mainContainer').load(pageRefSuccess);
+                //appPageHistory.push(pageRef);
+            } else if (data.Status == "Error") {
+                requestRunning = false;
+                successMessage = "Oops!! Something went wrong. Please contact system administrator";
+                j('#mainHeader').load(headerBackBtn);
+                j('#mainContainer').load(pageRefFailure);
+            } else {
+                requestRunning = false;
+                successMessage = "Error in synching expenses. Please contact system administrator";
+                j('#mainHeader').load(headerBackBtn);
+                j('#mainContainer').load(pageRefFailure);
+            }
+        },
+        error: function(data) {
+            j('#loading_Cat').hide();
+            requestRunning = false;
+            alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
+
+        }
+    });
+}
+
+function saveTravelSettleExpDetails(jsonTSArr, tsExpDetailsArr) {
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    var jsonToSaveTS = new Object();
+    jsonToSaveTS["employeeId"] = window.localStorage.getItem("EmployeeId");
+    jsonToSaveTS["expenseDetails"] = jsonTSArr;
+    requestRunning = true;
+    var pageRefSuccess = defaultPagePath + 'success.html';
+    var pageRefFailure = defaultPagePath + 'failure.html';
+    j.ajax({
+        url: window.localStorage.getItem("urlPath") + "SyncSettlementExpensesWebService",
+        type: 'POST',
+        dataType: 'json',
+        crossDomain: true,
+        data: JSON.stringify(jsonToSaveTS),
+        success: function(data) {
+            if (data.Status == "Success") {
+                successMessage = "Record(s) has been synchronized successfully.";
+                for (var i = 0; i < tsExpDetailsArr.length; i++) {
+                    var travelSettleExpDetailId = tsExpDetailsArr[i];
+                    deleteSelectedTSExpDetails(travelSettleExpDetailId);
+                }
+                requestRunning = false;
+                j('#mainHeader').load(headerBackBtn);
+                j('#mainContainer').load(pageRefSuccess);
+            } else if (data.Status == "Error") {
+                requestRunning = false;
+                successMessage = "Oops!! Something went wrong. Please contact system administrator.";
+                j('#mainHeader').load(headerBackBtn);
+                j('#mainContainer').load(pageRefFailure);
+            } else {
+                requestRunning = false;
+                successMessage = "Error in synching expenses. Please contact system administrator.";
+                j('#mainHeader').load(headerBackBtn);
+                j('#mainContainer').load(pageRefFailure);
+            }
+        },
+        error: function(data) {
+            requestRunning = false;
+            alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
+        }
+    });
+}
+
+function sendForApprovalBusinessDetails(jsonBEArr, busExpDetailsArr, accountHeadID) {
+    var jsonToSaveBE = new Object();
+    jsonToSaveBE["employeeId"] = window.localStorage.getItem("EmployeeId");
+    jsonToSaveBE["expenseDetails"] = jsonBEArr;
+    jsonToSaveBE["startDate"] = expenseClaimDates.minInStringFormat;
+    jsonToSaveBE["endDate"] = expenseClaimDates.maxInStringFormat;
+    jsonToSaveBE["DelayAllowCheck"] = false;
+    jsonToSaveBE["BudgetingStatus"] = window.localStorage.getItem("BudgetingStatus");
+    jsonToSaveBE["accountHeadId"] = accountHeadID;
+    jsonToSaveBE["ProcessStatus"] = "1";
+    jsonToSaveBE["title"] = window.localStorage.getItem("FirstName") + "/" + jsonToSaveBE["startDate"] + " to " + jsonToSaveBE["endDate"];
+
+    var pageRefSuccess = defaultPagePath + 'success.html';
+    var pageRefFailure = defaultPagePath + 'failure.html';
+    callSendForApprovalServiceForBE(jsonToSaveBE, busExpDetailsArr, pageRefSuccess, pageRefFailure);
+
+}
+
+function callSendForApprovalServiceForBE(jsonToSaveBE, busExpDetailsArr, pageRefSuccess, pageRefFailure) {
+
+    j('#loading_Cat').show();
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+
+    var status = validateExpenseAmtForVoucher(jsonToSaveBE);
+
+    if (status == true) {
+
+        validateMontlyAmtForVoucherForBE(jsonToSaveBE, busExpDetailsArr, pageRefSuccess, pageRefFailure);
+
+    } else {
+        j('#loading_Cat').hide();
+        requestRunning = false;
+    }
+}
+
+function createAccHeadDropDown(jsonAccHeadArr) {
+    var jsonArr = [];
+    if (jsonAccHeadArr != null && jsonAccHeadArr.length > 0) {
+        for (var i = 0; i < jsonAccHeadArr.length; i++) {
+            var stateArr = new Array();
+            stateArr = jsonAccHeadArr[i];
+            jsonArr.push({
+                id: stateArr.Label,
+                name: stateArr.Value
+            });
+        }
+    }
+    jsonArr.sort(function(a, b) { // sort object by Account Head Name
+        var nameA = a.name.toLowerCase(),
+            nameB = b.name.toLowerCase()
+        if (nameA < nameB) //sort string ascending
+            return -1
+        if (nameA > nameB)
+            return 1
+        return 0 //default return value (no sorting)
+    })
+    j("#accountHead").select2({
+        data: {
+            results: jsonArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: -1,
+        initSelection: function(element, callback) {
+            callback(jsonArr[4]);
+            getExpenseNamesBasedOnAccountHead();
+        },
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    }).select2("val", "");
+
+}
+
+function createTRAccHeadDropDown(jsonAccHeadArr) {
+    var jsonArr = [];
+    if (jsonAccHeadArr != null && jsonAccHeadArr.length > 0) {
+        for (var i = 0; i < jsonAccHeadArr.length; i++) {
+            var stateArr = new Array();
+            stateArr = jsonAccHeadArr[i];
+            jsonArr.push({
+                id: stateArr.Label,
+                name: stateArr.Value
+            });
+        }
+    }
+    j("#trAccountHead").select2({
+        data: {
+            results: jsonArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: -1,
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    });
+}
+
+function createExpNameDropDown(jsonExpNameArr) {
+    var jsonExpArr = [];
+    if (jsonExpNameArr != null && jsonExpNameArr.length > 0) {
+        for (var i = 0; i < jsonExpNameArr.length; i++) {
+            var stateArr = new Array();
+            stateArr = jsonExpNameArr[i];
+            jsonExpArr.push({
+                id: stateArr.ExpenseID,
+                name: stateArr.ExpenseName
+            });
+        }
+    }
+
+    $(".dropdown-content").hide();
+    document.getElementById("expFromLoc").value = "";
+    document.getElementById("expToLoc").value = "";
+    document.getElementById("expNarration").value = "";
+    document.getElementById("expUnit").value = "";
+    document.getElementById("expAmt").value = "";
+    fromLocationWayPoint = "";
+    toLocationWayPoint = "";
+
+    $("a").click(function() {
+        $("#mapLink").fadeTo("fast").removeAttr("href");
+    });
+
+    j("#expenseName").select2({
+        data: {
+            results: jsonExpArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: -1,
+        initSelection: function(element, callback) {
+            callback(jsonExpArr[5]);
+        },
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    }).select2("val", "");
+}
+
+function createCurrencyDropDown(jsonCurrencyArr) {
+    var jsonArr = [];
+    if (jsonCurrencyArr != null && jsonCurrencyArr.length > 0) {
+        for (var i = 0; i < jsonCurrencyArr.length; i++) {
+            var stateArr = new Array();
+            stateArr = jsonCurrencyArr[i];
+
+            jsonArr.push({
+                id: stateArr.Value,
+                name: stateArr.Label
+            });
+        }
+    }
+
+    j("#currency").select2({
+        data: {
+            results: jsonArr,
+            text: 'name'
+        },
+        placeholder: "Currency",
+        minimumResultsForSearch: -1,
+        initSelection: function(element, callback) {
+            callback(jsonArr[0]);
+        },
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    }).select2("val", jsonArr[0]);
+}
+
+function createTravelModeDown(jsonTrvlModeArr) {
+    var jsonArr = [];
+    if (jsonTrvlModeArr != null && jsonTrvlModeArr.length > 0) {
+        for (var i = 0; i < jsonTrvlModeArr.length; i++) {
+            var stateArr = new Array();
+            stateArr = jsonTrvlModeArr[i];
+
+            jsonArr.push({
+                id: stateArr.Value,
+                name: stateArr.Label
+            });
+        }
+    }
+
+    j("#travelMode").select2({
+        data: {
+            results: jsonArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: -1,
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    });
+
+    j("#roundTripMode").select2({
+        data: {
+            results: jsonArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: -1,
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    });
+
+    j("#travelModeForTS").select2({
+        data: {
+            results: jsonArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: -1,
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    });
+}
+
+function createCategoryDropDown(jsonCategoryArr) {
+    var jsonArr = [];
+    if (jsonCategoryArr != null && jsonCategoryArr.length > 0) {
+        for (var i = 0; i < jsonCategoryArr.length; i++) {
+            var stateArr = new Array();
+            stateArr = jsonCategoryArr[i];
+            jsonArr.push({
+                id: stateArr.Value,
+                name: stateArr.Label
+            });
+        }
+    }
+
+    j("#travelCategory").select2({
+        data: {
+            results: jsonArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: -1,
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    });
+
+    j("#roundTripCategory").select2({
+        data: {
+            results: jsonArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: -1,
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    });
+
+    j("#travelCategoryForTS").select2({
+        data: {
+            results: jsonArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: -1,
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    });
+}
+
+function createCitytownDropDown(jsonCityTownArr) {
+    var jsonArr = [];
+    if (jsonCityTownArr != null && jsonCityTownArr.length > 0) {
+        for (var i = 0; i < jsonCityTownArr.length; i++) {
+            var stateArr = new Array();
+            stateArr = jsonCityTownArr[i];
+            jsonArr.push({
+                id: stateArr.Value,
+                name: stateArr.Label
+            });
+        }
+    }
+
+    j("#fromCitytown").select2({
+        data: {
+            results: jsonArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: 2,
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    });
+
+    j("#toCitytown").select2({
+        data: {
+            results: jsonArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: 2,
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    });
+
+    j("#Citytown").select2({
+        data: {
+            results: jsonArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: 2,
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    });
+}
+
+function createTravelTypeDropDown(jsonTravelTypeArr) {
+    var jsonArr = [];
+    if (jsonTravelTypeArr != null && jsonTravelTypeArr.length > 0) {
+        for (var i = 0; i < jsonTravelTypeArr.length; i++) {
+            var stateArr = new Array();
+            stateArr = jsonTravelTypeArr[i];
+            jsonArr.push({
+                id: stateArr.Value,
+                name: stateArr.Label
+            });
+        }
+    }
+
+    j("#travelType").select2({
+        data: {
+            results: jsonArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: -1,
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    });
+}
+
+function getFormattedDate(input) {
+    var inputDate = input.split('-');
+    var month = inputDate[1];
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    return inputDate[0] + "-" + months[(month - 1)] + "-" + inputDate[2];
+
+}
+
+function validateExpenseDetails(exp_date, exp_from_loc, exp_to_loc, exp_narration, exp_unit, exp_amt, acc_head_id, exp_name_id, currency_id, file) {
+    if (exp_date == "") {
+        alert(window.lang.translate('Expense Date is invalid'));
+        return false;
+    }
+    if (acc_head_id == "-1") {
+        alert(window.lang.translate('Account Head is invalid'));
+        return false;
+    }
+    if (exp_name_id == "-1") {
+        alert(window.lang.translate('Expense Name is invalid'));
+        return false;
+    }
+    if (flagForUnitEnable == true) {
+        if (isZero(exp_unit, "Unit") == false) {
+            document.getElementById("expUnit").value = "";
+            return false;
+        }
+    }
+    if (isZero(exp_amt, "Amount") == false) {
+        document.getElementById("expAmt").value = "";
+        return false;
+    }
+    if (perUnitDetailsJSON.expenseIsfromAndToReqd != 'N') {
+        if (exp_from_loc == "") {
+            alert(window.lang.translate('From Location is invalid'));
+            return false;
+        }
+        if (exp_to_loc == "") {
+            alert(window.lang.translate('To Location is invalid'));
+            return false;
+        }
+    }
+
+    if (exp_narration == "") {
+        alert(window.lang.translate('Narration is invalid'));
+        return false;
+    }
+
+    if (perUnitDetailsJSON.expIsUnitReq == 'Y') {
+
+        if (exp_unit != "") {
+            if (isOnlyNumeric(exp_unit, "Unit") == false) {
+                return false;
+            }
+
+        } else {
+            alert(window.lang.translate('Unit is invalid'));
+            return false;
+        }
+    }
+
+    if (exp_amt != "") {
+        if (isNumber_optionalDot(exp_amt, "Amount") == false) {
+            return false;
+        }
+
+    } else {
+        alert(window.lang.translate('Amount is invalid'));
+        return false;
+    }
+
+    if (currency_id == "-1") {
+        alert(window.lang.translate('Currency Name is invalid'));
+        return false;
+    }
+
+    if (perUnitDetailsJSON.isAttachmentReq == 'Y') {
+
+        if (file == "" || file == undefined) {
+            alert(window.lang.translate('Attachment is mandatory.'));
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function syncSubmitTravelDetails() {
+
+    var tvl_hotel = document.getElementById('travelHotel').value;
+    var tvl_plane = document.getElementById('travelPlane').value;
+    var tvl_car = document.getElementById('travelCar').value;
+    var tvl_rnd_hotel = document.getElementById('roundTravelHotel').value;
+    var tvl_rnd_plane = document.getElementById('roundTravelPlane').value;
+    var tvl_rnd_car = document.getElementById('roundTravelCar').value;
+    var tvl_date = document.getElementById('selectDate_One').value;
+    var tvl__rod_dateOne = document.getElementById('selectDate_Two').value;
+    var tvl__rod_dateTwo = document.getElementById('selectDate_Three').value;
+    var tvl_time = document.getElementById('selectTime_One');
+    var tv2_time = document.getElementById('selectTime_Two');
+    var tv3_time = document.getElementById('selectTime_Three');
+    var travel_title = document.getElementById('travelTitle').value;
+    var travel_purpose_id;
+    var from_id;
+    var from_val;
+    var to_id;
+    var to_val;
+    var account_head_id;
+    var travel_mode_id;
+    var travel_category_id;
+    var tvl_mode_rnd_id;
+    var tvl_category_rnd_id;
+    var advance_req = $("input[name='type']:checked").val();
+    var advance_amount = document.getElementById('advanceReq').value;
+
+    if (j("#travelType").select2('data') != null) {
+        travel_purpose_id = j("#travelType").select2('data').id;
+    } else {
+        travel_purpose_id = '-1';
+    }
+
+    if (j("#fromCitytown").select2('data') != null) {
+        from_id = j("#fromCitytown").select2('data').id;
+        from_val = j("#fromCitytown").select2('data').name;
+    } else {
+        from_id = '-1';
+    }
+
+    if (j("#trAccountHead").select2('data') != null) {
+        account_head_id = j("#trAccountHead").select2('data').id;
+    } else {
+        account_head_id = '-1';
+    }
+
+    if (j("#toCitytown").select2('data') != null) {
+        to_id = j("#toCitytown").select2('data').id;
+        to_val = j("#toCitytown").select2('data').name;
+    } else {
+        to_id = '-1';
+    }
+
+    if (j("#travelMode").select2('data') != null) {
+        travel_mode_id = j("#travelMode").select2('data').id;
+    } else {
+        travel_mode_id = '-1';
+    }
+    if (j("#travelCategory").select2('data') != null) {
+        travel_category_id = j("#travelCategory").select2('data').id;
+    } else {
+        travel_category_id = '-1';
+    }
+
+    if (j("#roundTripMode").select2('data') != null) {
+        tvl_mode_rnd_id = j("#roundTripMode").select2('data').id;
+    } else {
+        tvl_mode_rnd_id = '-1';
+    }
+    if (j("#roundTripCategory").select2('data') != null) {
+        tvl_category_rnd_id = j("#roundTripCategory").select2('data').id;
+    } else {
+        tvl_category_rnd_id = '-1';
+    }
+
+    if (validatetravelDetails(travel_purpose_id, account_head_id, from_id, to_id, travel_mode_id, travel_category_id, tvl_mode_rnd_id, tvl_category_rnd_id, tvl_date, travel_title, advance_req, advance_amount)) {
+
+        var jsonToSaveTR = new Object();
+        j('#loading_Cat').show();
+        jsonToSaveTR["EmployeeId"] = window.localStorage.getItem("EmployeeId");;
+        jsonToSaveTR["BudgetingStatus"] = window.localStorage.getItem("BudgetingStatus");;
+        jsonToSaveTR["TravelPurpose"] = travel_purpose_id;
+        jsonToSaveTR["AccountHeadId"] = account_head_id;
+        jsonToSaveTR["FromLocation"] = from_id;
+        jsonToSaveTR["FromLocationName"] = from_val;
+        jsonToSaveTR["ToLocaton"] = to_id;
+        jsonToSaveTR["ToLocatonName"] = to_val;
+        jsonToSaveTR["TravelTitle"] = travel_title;
+        jsonToSaveTR["EntitlementAllowCheck"] = false;
+        jsonToSaveTR["AdvanceRequested"] = advance_req;
+        jsonToSaveTR["AdvanceAmount"] = advance_amount;
+
+        var listItineraryTab = document.getElementById('myTab');
+        if (hasClass(listItineraryTab.children[0], "active")) {
+            jsonToSaveTR["ItenaryType"] = 'O';
+            jsonToSaveTR["TravelModeId"] = travel_mode_id;
+            jsonToSaveTR["TravelCategoryId"] = travel_category_id;
+            jsonToSaveTR["Hotel"] = tvl_hotel;
+            jsonToSaveTR["TravelTicket"] = tvl_plane;
+            jsonToSaveTR["CarRent"] = tvl_car;
+
+            if (clickedFlagCar == true) {
+                jsonToSaveTR["IsCarRent"] = 'true';
+            } else {
+                jsonToSaveTR["IsCarRent"] = 'false';
+            }
+            if (clickedFlagTicket == true) {
+                jsonToSaveTR["IsTravelTicket"] = 'true';
+            } else {
+                jsonToSaveTR["IsTravelTicket"] = 'false';
+            }
+            if (clickedFlagHotel == true) {
+                jsonToSaveTR["IsHotel"] = 'true';
+            } else {
+                jsonToSaveTR["IsHotel"] = 'false';
+            }
+            jsonToSaveTR["DepartDate"] = tvl_date;
+            jsonToSaveTR["ArriveDate"] = tvl_date;
+            if (tvl_time.value != null) {
+                jsonToSaveTR["DepartTime"] = tvl_time.value;
+                jsonToSaveTR["ArriveTime"] = '12:00 AM';
+            } else {
+                jsonToSaveTR["DepartTime"] = '12:00 AM';
+                jsonToSaveTR["ArriveTime"] = '12:00 AM';
+            }
+
+        } else {
+            jsonToSaveTR["ItenaryType"] = 'R';
+            jsonToSaveTR["TravelModeId"] = tvl_mode_rnd_id;
+            jsonToSaveTR["TravelCategoryId"] = tvl_category_rnd_id;
+            jsonToSaveTR["Hotel"] = tvl_rnd_hotel;
+            jsonToSaveTR["TravelTicket"] = tvl_rnd_plane;
+            jsonToSaveTR["CarRent"] = tvl_rnd_car;
+
+            if (clickedCarRound == true) {
+                jsonToSaveTR["IsCarRent"] = 'true';
+            } else {
+                jsonToSaveTR["IsCarRent"] = 'false';
+            }
+            if (clickedTicketRound == true) {
+                jsonToSaveTR["IsTravelTicket"] = 'true';
+            } else {
+                jsonToSaveTR["IsTravelTicket"] = 'false';
+            }
+            if (clickedHotelRound == true) {
+                jsonToSaveTR["IsHotel"] = 'true';
+            } else {
+                jsonToSaveTR["IsHotel"] = 'false';
+            }
+            if (tv2_time.value != null && tv3_time.value != null) {
+                jsonToSaveTR["DepartTime"] = tv3_time.value;
+                jsonToSaveTR["ArriveTime"] = tv2_time.value;
+            } else {
+                jsonToSaveTR["DepartTime"] = '12:00 AM';
+                jsonToSaveTR["ArriveTime"] = '12:00 AM';
+            }
+            jsonToSaveTR["DepartDate"] = tvl__rod_dateTwo;
+            jsonToSaveTR["ArriveDate"] = tvl__rod_dateOne;
+
+        }
+
+        saveTravelRequestAjax(jsonToSaveTR);
+    } else {
+        return false;
+    }
+}
+
+function saveTravelRequestAjax(jsonToSaveTR) {
+    var pageRefSuccess = defaultPagePath + 'success.html';
+    var pageRefFailure = defaultPagePath + 'failure.html';
+    j('#loading_Cat').show();
+    j.ajax({
+        url: window.localStorage.getItem("urlPath") + "SyncTravelRequestDetail",
+        type: 'POST',
+        dataType: 'json',
+        crossDomain: true,
+        data: JSON.stringify(jsonToSaveTR),
+        success: function(data) {
+            if (data.Status == "Failure") {
+                j('#loading_Cat').hide();
+                if (data.hasOwnProperty('IsEntitlementExceed')) {
+                    setTREntitlementExceedMessage(data, jsonToSaveTR);
+                } else {
+                    j('#loading_Cat').hide();
+                    alert(data.Message);
+                }
+
+            } else if (data.Status == "Success") {
+                successMessage = data.Message;
+                j('#loading_Cat').hide();
+                j('#mainContainer').load(pageRefSuccess);
+                appPageHistory.push(pageRefSuccess);
+            } else {
+                successMessage = "Error: Oops something is wrong, Please Contact System Administer";
+                j('#loading_Cat').hide();
+                j('#mainContainer').load(pageRefFailure);
+                appPageHistory.push(pageRefFailure);
+            }
+        },
+        error: function(data) {
+            successMessage = "Error: Oops something is wrong, Please Contact System Administer";
+            j('#loading_Cat').hide();
+            j('#mainContainer').load(pageRefFailure);
+            appPageHistory.push(pageRefFailure);
+        }
+    });
+}
+
+function hasClass(ele, cls) {
+    return !!ele.className.match(new RegExp('(\\s|^)' + cls + '(\\s|$)'));
+}
+
+function setBooleanValueCar() {
+    if (clickedFlagCar == false) {
+        document.getElementById('carActive').style.display = "";
+        document.getElementById('carDisabled').style.display = "none";
+        document.getElementById('travelCar').focus();
+        clickedFlagCar = true;
+    } else {
+        document.getElementById('carActive').style.display = "none";
+        document.getElementById('carDisabled').style.display = "";
+        document.getElementById('travelCar').value = "";
+        clickedFlagCar = false;
+    }
+}
+
+function setBooleanValueCarTextField() {
+    if (clickedFlagCar == false) {
+        document.getElementById('carActive').style.display = "";
+        document.getElementById('carDisabled').style.display = "none";
+        document.getElementById('travelCar').focus();
+        clickedFlagCar = true;
+    }
+}
+
+function setBooleanValueTicket() {
+    if (clickedFlagTicket == false) {
+        document.getElementById('ticketActive').style.display = "";
+        document.getElementById('ticketDisabled').style.display = "none";
+        document.getElementById('travelPlane').focus();
+        clickedFlagTicket = true;
+    } else {
+        document.getElementById('ticketActive').style.display = "none";
+        document.getElementById('ticketDisabled').style.display = "";
+        document.getElementById('travelPlane').value = "";
+        clickedFlagTicket = false;
+    }
+}
+
+function setBooleanValueTicketTextField() {
+    if (clickedFlagTicket == false) {
+        document.getElementById('ticketActive').style.display = "";
+        document.getElementById('ticketDisabled').style.display = "none";
+        document.getElementById('travelPlane').focus();
+        clickedFlagTicket = true;
+    }
+}
+
+function setBooleanValueHotel() {
+    if (clickedFlagHotel == false) {
+        document.getElementById('hotelActive').style.display = "";
+        document.getElementById('hotelDisabled').style.display = "none";
+        document.getElementById('travelHotel').focus();
+        clickedFlagHotel = true;
+    } else {
+        document.getElementById('hotelActive').style.display = "none";
+        document.getElementById('hotelDisabled').style.display = "";
+        document.getElementById('travelHotel').value = "";
+        clickedFlagHotel = false;
+    }
+}
+
+function setBooleanValueHotelTextField() {
+    if (clickedFlagHotel == false) {
+        document.getElementById('hotelActive').style.display = "";
+        document.getElementById('hotelDisabled').style.display = "none";
+        document.getElementById('travelHotel').focus();
+        clickedFlagHotel = true;
+    }
+}
+
+function setBooleanValueCarRound() {
+    if (clickedCarRound == false) {
+        document.getElementById('carRoundActive').style.display = "";
+        document.getElementById('carRoundDisabled').style.display = "none";
+        document.getElementById('roundTravelCar').focus();
+        clickedCarRound = true;
+    } else {
+        document.getElementById('carRoundActive').style.display = "none";
+        document.getElementById('carRoundDisabled').style.display = "";
+        document.getElementById('roundTravelCar').value = "";
+        clickedCarRound = false;
+    }
+}
+
+function setBooleanValueCarRoundTextField() {
+    if (clickedCarRound == false) {
+        document.getElementById('carRoundActive').style.display = "";
+        document.getElementById('carRoundDisabled').style.display = "none";
+        document.getElementById('roundTravelCar').focus();
+        clickedCarRound = true;
+    }
+}
+
+function setBooleanValueTicketRound() {
+    if (clickedTicketRound == false) {
+        document.getElementById('ticketRoundActive').style.display = "";
+        document.getElementById('ticketRoundDisabled').style.display = "none";
+        document.getElementById('roundTravelPlane').focus();
+        clickedTicketRound = true;
+    } else {
+        document.getElementById('ticketRoundActive').style.display = "none";
+        document.getElementById('ticketRoundDisabled').style.display = "";
+        document.getElementById('roundTravelPlane').value = "";
+        clickedTicketRound = false;
+    }
+}
+
+function setBooleanValueTicketRoundTextField() {
+    if (clickedTicketRound == false) {
+        document.getElementById('ticketRoundActive').style.display = "";
+        document.getElementById('ticketRoundDisabled').style.display = "none";
+        document.getElementById('roundTravelPlane').focus();
+        clickedTicketRound = true;
+    }
+}
+
+function setBooleanValueHotelRound() {
+    if (clickedHotelRound == false) {
+        document.getElementById('hotelRoundActive').style.display = "";
+        document.getElementById('hotelRoundDisabled').style.display = "none";
+        document.getElementById('roundTravelHotel').focus();
+        clickedHotelRound = true;
+    } else {
+        document.getElementById('hotelRoundActive').style.display = "none";
+        document.getElementById('hotelRoundDisabled').style.display = "";
+        document.getElementById('roundTravelHotel').value = "";
+        clickedHotelRound = false;
+    }
+}
+
+function setBooleanValueHotelRoundTextField() {
+    if (clickedHotelRound == false) {
+        document.getElementById('hotelRoundActive').style.display = "";
+        document.getElementById('hotelRoundDisabled').style.display = "none";
+        document.getElementById('roundTravelHotel').focus();
+        clickedHotelRound = true;
+    }
+}
+
+function validatetravelDetails(travel_purpose_id, account_head_id, from_id, to_id, travel_mode_id, travel_category_id, tvl_mode_rnd_id, tvl_category_rnd_id, tvl_date, travel_title, advance_req, advance_amount) {
+    if (travel_title == "") {
+        alert(window.lang.translate('Travel Title is required'));
+        return false;
+    }
+    if (travel_purpose_id == "-1") {
+        alert(window.lang.translate('Purpose Of Travel is invalid'));
+        return false;
+    }
+    if (account_head_id == "-1") {
+        alert(window.lang.translate('Account Head is invalid'));
+        return false;
+    }
+    if (from_id == "-1") {
+        alert(window.lang.translate('From Location is invalid'));
+        return false;
+    }
+    if (to_id == "-1") {
+        alert(window.lang.translate('To Location is invalid'));
+        return false;
+    }
+    var listItineraryTab = document.getElementById('myTab');
+    if (hasClass(listItineraryTab.children[0], "active")) {
+        if (travel_mode_id == "-1") {
+            alert(window.lang.translate('Mode is invalid'));
+            return false;
+        }
+        if (travel_category_id == "-1") {
+            alert(window.lang.translate('Category is invalid'));
+            return false;
+        }
+        if (document.getElementById('selectDate_One').value == "Select Date") {
+            alert(window.lang.translate('Travel Date is invalid'));
+            return false;
+        }
+    } else {
+        if (tvl_mode_rnd_id == "-1") {
+            alert(window.lang.translate('Mode is invalid'));
+            return false;
+        }
+        if (tvl_category_rnd_id == "-1") {
+            alert(window.lang.translate('Category is invalid'));
+            return false;
+        }
+        if (document.getElementById('selectDate_Three').value == "Select Date") {
+            alert(window.lang.translate('Travel Date is invalid'));
+            return false;
+        }
+        if (document.getElementById('selectDate_Two').value == "Select Date") {
+            alert(window.lang.translate('Travel Date is invalid'));
+            return false;
+        }
+    }
+    // ************************************   Advance Check - Start ****************************************************//
+    if (advance_req == 'Y') {
+        if (advance_amount == "") {
+            alert(window.lang.translate('Advance Amount is required'));
+            return false;
+        }
+
+    }
+    // ************************************   Advance Check - Start ****************************************************//
+
+    return true;
+}
+
+function resetOneTrip() {
+    j('#travelMode').select2('data', '');
+    j('#travelCategory').select2('data', '');
+    document.getElementById('travelCar').value = "";
+    document.getElementById('travelHotel').value = "";
+    document.getElementById('travelPlane').value = "";
+    j('#delayDaysMsgArea').children('span').text("");
+    document.getElementById('selectDate_One').value = "";
+    document.getElementById('selectTime_One').value = "";
+    j('#overlapMsgArea').children('span').text("");
+    j('#overlapMsgRoundTripArea').children('span').text("");
+    j('#delayDaysMsgRoundArea').children('span').text("");
+    j('#validationMsgBox').hide();
+    j('#validationMsgBoxRoundTrip').hide();
+    document.getElementById("selectDate_One").style.borderColor = "#cccccc";
+    document.getElementById("selectDate_Two").style.borderColor = "#cccccc";
+    document.getElementById("selectDate_Three").style.borderColor = "#cccccc";
+}
+
+function resetRoundTrip() {
+    j('#roundTripMode').select2('data', '');
+    j('#roundTripCategory').select2('data', '');
+    document.getElementById('roundTravelCar').value = "";
+    document.getElementById('roundTravelHotel').value = "";
+    document.getElementById('roundTravelPlane').value = "";
+    j('#delayDaysMsgArea').children('span').text("");
+    document.getElementById('selectDate_Three').value = "";
+    document.getElementById('selectDate_Two').value = "";
+    document.getElementById('selectTime_Two').value = "";
+    document.getElementById('selectTime_Three').value = "";
+    j('#overlapMsgArea').children('span').text("");
+    j('#overlapMsgRoundTripArea').children('span').text("");
+    j('#delayDaysMsgRoundArea').children('span').text("");
+    j('#validationMsgBox').hide();
+    j('#validationMsgBoxRoundTrip').hide();
+    document.getElementById("selectDate_One").style.borderColor = "#cccccc";
+    document.getElementById("selectDate_Two").style.borderColor = "#cccccc";
+    document.getElementById("selectDate_Three").style.borderColor = "#cccccc";
+}
+
+function onloadTimePicker() {
+
+    if (top.location != location) {
+        top.location.href = document.location.href;
+    }
+
+    j('.timepicker1').timepicki();
+}
+
+function getExpenseNamesOnRequestNoChange() {
+
+    var travelRequestId = j("#travelRequestName").select2('data').id;
+    getExpenseNamesfromDBTravel(travelRequestId);
+}
+
+function getStartandEndOnRequestNoChange() {
+
+    var travelRequestId = j("#travelRequestName").select2('data').id;
+    getStartEndDatefromDBTravel(travelRequestId);
+}
+
+function getCurrencyOnRequestNoChange() {
+
+    var travelRequestId = j("#travelRequestName").select2('data').id;
+    getCurrencyDBTravel(travelRequestId);
+}
+
+function getExpenseNamesBasedOnAccountHead() {
+    var accountHeadID = j("#accountHead").select2('data').id;
+    getExpenseNamesfromDB(accountHeadID);
+}
+
+function getPerUnitBasedOnExpense() {
+    var expenseNameID = j("#expenseName").select2('data').id;
+    getPerUnitFromDB(expenseNameID);
+}
+
+function getModeCatergoryBasedOnExpenseName() {
+
+    var expenseNameID = j("#travelExpenseName").select2('data').id;
+    getModecategoryFromDB(expenseNameID);
+}
+
+function getCatergoryBasedOnMode() {
+
+    var modeID = j("#travelMode").select2('data').id;
+    getCategoryFromDB(modeID);
+}
+
+function getCatergoryBasedOnModeForTS() {
+
+    var modeID = j("#travelModeForTS").select2('data').id;
+    getCategoryFromDB(modeID);
+}
+
+function getRoundCatergoryBasedOnMode() {
+
+    var modeID = j("#roundTripMode").select2('data').id;
+    getCategoryFromDB(modeID);
+}
+
+function setPerUnitDetails(transaction, results) {
+
+    if (results != null) {
+        var row = results.rows.item(0);
+        perUnitDetailsJSON["expenseIsfromAndToReqd"] = row.expIsFromToReq;
+        perUnitDetailsJSON["isUnitReqd"] = row.expIsUnitReq;
+        perUnitDetailsJSON["expRatePerUnit"] = row.expRatePerUnit;
+        perUnitDetailsJSON["expFixedOrVariable"] = row.expFixedOrVariable;
+        perUnitDetailsJSON["expFixedLimitAmt"] = row.expFixedLimitAmt;
+        perUnitDetailsJSON["expenseName"] = row.expName;
+        perUnitDetailsJSON["expPerUnitActiveInative"] = row.expPerUnitActiveInative;
+        perUnitDetailsJSON["isErReqd"] = row.isErReqd;
+        perUnitDetailsJSON["limitAmountForER"] = row.limitAmountForER;
+        perUnitDetailsJSON["isAttachmentReq"] = row.isAttachmentReq;
+        showAttachmentmessage();
+
+        document.getElementById("ratePerUnit").value = row.expRatePerUnit;
+        document.getElementById("expAmt").value = "";
+        document.getElementById("expUnit").value = "";
+        document.getElementById("expFromLoc").value = "";
+        document.getElementById("expToLoc").value = "";
+        document.getElementById("expNarration").value = "";
+        document.getElementById("expUnit").value = "";
+        document.getElementById("expAmt").value = "";
+        $(".dropdown-content").hide();
+        fromLocationWayPoint = "";
+        toLocationWayPoint = "";
+        if (perUnitDetailsJSON.expenseIsfromAndToReqd == 'N') {
+            document.getElementById("expFromLoc").value = "";
+            document.getElementById("expToLoc").value = "";
+            document.getElementById("expFromLoc").disabled = true;
+            document.getElementById("expToLoc").disabled = true;
+            document.getElementById("expFromLoc").style.backgroundColor = '#d1d1d1';
+            document.getElementById("expToLoc").style.backgroundColor = '#d1d1d1';
+            document.getElementById("expNarration").disabled = false;
+            document.getElementById("expNarration").style.backgroundColor = '#FFFFFF';
+            document.getElementById("mapImage").style.display = "none";
+            $(".dropdown-content").hide();
+            fromLocationWayPoint = "";
+            toLocationWayPoint = "";
+        } else {
+            document.getElementById("expFromLoc").disabled = false;
+            document.getElementById("expToLoc").disabled = false;
+            document.getElementById("expFromLoc").value = "";
+            document.getElementById("expToLoc").value = "";
+            document.getElementById("expNarration").value = "";
+            document.getElementById("expFromLoc").style.backgroundColor = '#FFFFFF';
+            document.getElementById("expToLoc").style.backgroundColor = '#FFFFFF';
+            $(".dropdown-content").hide();
+            fromLocationWayPoint = "";
+            toLocationWayPoint = "";
+            if (window.localStorage.getItem("MobileMapRole") == 'true') {
+                if (window.localStorage.getItem("MapProvider") == "GOOGLEMAP") {
+                    attachGoogleSearchBox(document.getElementById("expFromLoc"));
+                    attachGoogleSearchBox(document.getElementById("expToLoc"));
+                }
+                document.getElementById("mapImage").style.display = "";
+                document.getElementById("expNarration").disabled = true;
+                document.getElementById("expNarration").style.backgroundColor = '#d1d1d1';
+            }
+        }
+        if (perUnitDetailsJSON.isUnitReqd == 'Y') {
+            document.getElementById("expAmt").value = "";
+            if (perUnitDetailsJSON.expFixedOrVariable == 'V') {
+                flagForUnitEnable = true;
+                if (perUnitDetailsJSON.expenseIsfromAndToReqd == 'Y' && window.localStorage.getItem("MobileMapRole") == 'true') {
+                    document.getElementById("expUnit").disabled = true;
+                    document.getElementById("expUnit").style.backgroundColor = '#d1d1d1';
+                } else {
+                    document.getElementById("expUnit").disabled = false;
+                    document.getElementById("expUnit").style.backgroundColor = '#FFFFFF';
+                }
+                document.getElementById("expAmt").disabled = false;
+                document.getElementById("expAmt").style.backgroundColor = '#FFFFFF';
+            } else {
+                flagForUnitEnable = true;
+                if (perUnitDetailsJSON.expenseIsfromAndToReqd == 'Y' && window.localStorage.getItem("MobileMapRole") == 'true') {
+                    document.getElementById("expUnit").disabled = true;
+                    document.getElementById("expUnit").style.backgroundColor = '#d1d1d1';
+                } else {
+                    document.getElementById("expUnit").disabled = false;
+                    document.getElementById("expUnit").style.backgroundColor = '#FFFFFF';
+                }
+                document.getElementById("expAmt").disabled = true;
+                document.getElementById("expAmt").style.backgroundColor = '#d1d1d1';
+            }
+        } else {
+            flagForUnitEnable = false;
+            document.getElementById("expUnit").disabled = true;
+            document.getElementById("expUnit").style.backgroundColor = '#d1d1d1';
+            document.getElementById("expAmt").disabled = false;
+            document.getElementById("expAmt").style.backgroundColor = '#FFFFFF';
+        }
+        if (perUnitDetailsJSON.expPerUnitActiveInative == '1') {
+            flagForUnitEnable = false;
+            document.getElementById("expUnit").disabled = true;
+            document.getElementById("expAmt").disabled = false;
+            document.getElementById("expAmt").style.backgroundColor = '#FFFFFF';
+            document.getElementById("expUnit").style.backgroundColor = '#d1d1d1';
+        }
+    } else {
+
+        alert("Please Synch your expense Names to claim expense.");
+    }
+
+}
+
+function setModeCategroyDetails(transaction, results) {
+
+    if (results != null) {
+        var row = results.rows.item(0);
+        ismodeCategoryJSON = new Object();
+        ismodeCategoryJSON["expenseNameId"] = row.expenseNameId;
+        ismodeCategoryJSON["isModeCategory"] = row.isModeCategory;
+        if (ismodeCategoryJSON.isModeCategory == 'N') {
+            j('#travelModeForTS').select2('data', '');
+            j('#travelCategoryForTS').select2('data', '');
+            j('#travelModeForTS').select2('disable');
+            j('#travelCategoryForTS').select2('disable');
+        } else {
+            j('#travelModeForTS').select2('enable');
+            j('#travelCategoryForTS').select2('enable');
+        }
+    } else {
+
+        alert("Please synch your expense names to settle your travel request.");
+    }
+
+}
+
+function checkPerUnitExceptionStatusForBEAtLineLevel() {
+    exceptionStatus = "N";
+    exceptionMessage = '';
+    //String acExpNameReqStatus = findByIdAccountCodeExpenseNameRequiredStatus(accountCodeId);
+
+    //CASE 1 : IF THE EXP NAME REQUIRED STATUS IS 'Y' FURTHER COMPUTE TO GET THE EXCEPTION STATUS
+    //CASE 2 : IF 'N' THEN SET THE EXCEPTION STATUS AS 'N' AS THIS AC CODE IS NA FOR BE ENTITLEMENTS
+
+    var perUnitStatus = perUnitDetailsJSON.isUnitReqd;
+    var fixedOrVariable = perUnitDetailsJSON.expFixedOrVariable;
+    var ratePerUnit = perUnitDetailsJSON.expRatePerUnit;
+    var limitAmt = perUnitDetailsJSON.expFixedLimitAmt;
+    var expName = perUnitDetailsJSON.expenseName;
+    var expActiveInactive = perUnitDetailsJSON.expPerUnitActiveInative;
+    var amount = document.getElementById("expAmt").value;
+    var unitValue = document.getElementById("expUnit").value;
+
+    if (expActiveInactive == '1') {
+        exceptionStatus = "N";
+        j('#errorMsgArea').children('span').text("");
+    }
+    if (perUnitStatus != "" && limitAmt != "" && amount != "" && perUnitStatus == 'N' && expActiveInactive != '1') {
+        if (parseFloat(limitAmt) < parseFloat(amount)) {
+            exceptionStatus = "Y";
+            exceptionMessage = "(Exceeding per unit amount defined: " + limitAmt + " for expense name " + expName + ")";
+            j('#errorMsgArea').children('span').text(exceptionMessage);
+        } else {
+            exceptionStatus = "N";
+            j('#errorMsgArea').children('span').text("");
+        }
+    } else if (perUnitStatus != "" && ratePerUnit != "" && amount != "" && fixedOrVariable != "" && unitValue != "" && perUnitStatus == 'Y' && fixedOrVariable == 'V' && expActiveInactive != '1') {
+
+        if (parseFloat(ratePerUnit) < amount / unitValue) {
+            exceptionStatus = "Y";
+            exceptionMessage = "(Exceeding per unit amount defined: " + ratePerUnit + " for expense name " + expName + ")";
+            j('#errorMsgArea').children('span').text(exceptionMessage);
+        } else {
+            exceptionStatus = "N";
+            j('#errorMsgArea').children('span').text("");
+        }
+    }
+
+}
+
+function calculatePerUnit() {
+
+    var unit = document.getElementById("expUnit").value;
+    if (isOnlyNumeric(unit, "Unit") == false) {
+        document.getElementById("expUnit").value = "";
+        return false;
+    }
+    var perUnitStatus = perUnitDetailsJSON.expIsUnitReq;
+    var fixedOrVariable = perUnitDetailsJSON.expFixedOrVariable;
+    var ratePerUnit = perUnitDetailsJSON.expRatePerUnit;
+    var limitAmt = perUnitDetailsJSON.expFixedLimitAmt;
+    var expName = perUnitDetailsJSON.expenseName;
+    var result = '';
+    var unitValue = document.getElementById("expUnit").value;
+    if (unitValue != null && unitValue != '' && ratePerUnit != '' && ratePerUnit != null) {
+        result = parseFloat(unitValue) * parseFloat(ratePerUnit);
+    }
+    document.getElementById("expAmt").value = result;
+
+}
+
+function checkAmount() {
+
+    var amount = document.getElementById("expAmt").value;
+    if (isNumber_optionalDot(amount, "Amount") == false) {
+        document.getElementById("expAmt").value = "";
+        return false;
+    }
+}
+
+function checkEnterAmount() {
+
+    var amount = document.getElementById("empAdvAmount").value;
+    if (isOnlyNumeric(amount, "Amount") == false) {
+        document.getElementById("empAdvAmount").value = "";
+        return false;
+    }
+}
+
+function validateNumericField(obj) {
+
+    if (document.getElementById("expAmt").value)
+        if (obj == 'expAmt') {
+            var amt = document.getElementById("expAmt").value;
+            if (isOnlyNumeric(amt, "Amount") == false) {
+                document.getElementById("expAmt").value = "";
+                return false;
+            }
+        } else if (obj == 'expUnit') {
+        var unit = document.getElementById("expUnit").value;
+        if (isOnlyNumeric(amt, "Unit") == false) {
+            document.getElementById("expUnit").value = "";
+            return false;
+        }
+    }
+}
+
+function setDelayMessage(returnJsonData, jsonToBeSend, busExpDetailsArr) {
+    var pageRefSuccess = defaultPagePath + 'success.html';
+    var pageRefFailure = defaultPagePath + 'failure.html';
+    if (returnJsonData.DelayStatus == 'Y') {
+        exceptionMessage = "This voucher has exceeded Time Limit.";
+
+        j('#displayError').children('span').text(exceptionMessage);
+        j('#displayError').hide().fadeIn('slow').delay(2000).fadeOut('slow');
+
+    } else {
+
+        if (confirm(window.lang.translate("This voucher has exceeded Time Limit. Do you want to proceed?")) == false) {
+            return false;
+        }
+        jsonToBeSend["DelayAllowCheck"] = true;
+        callSendForApprovalServiceForBE(jsonToBeSend, busExpDetailsArr, pageRefSuccess, pageRefFailure);
+    }
+}
+
+function setTREntitlementExceedMessage(returnJsonData, jsonToBeSend) {
+    var msg = returnJsonData.Message + ".\nThis voucher has exceeded Entitlements. Do you want to proceed?";
+    var IsEntitlementExceed = confirm(msg);
+    if (IsEntitlementExceed == true) {
+        onConfirm(IsEntitlementExceed, msg, jsonToBeSend);
+    } else {
+        return false;
+    }
+}
+
+function onConfirm(IsEntitlementExceed, errormsg, jsonToBeSend) {
+    if (IsEntitlementExceed == true) {
+        jsonToBeSend["EntitlementAllowCheck"] = true;
+        j('#loading_Cat').show();
+        saveTravelRequestAjax(jsonToBeSend);
+    } else {
+        j('#loading_Cat').hide();
+        return false;
+    }
+
+}
+
+function cerateTravelSettlement() {
+
+    var pageRef = defaultPagePath + 'addTravelSettlement.html';
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+function createTravelExpenseNameDropDown(jsonExpenseNameArr) {
+    var jsonExpArr = [];
+    if (jsonExpenseNameArr != null && jsonExpenseNameArr.length > 0) {
+        for (var i = 0; i < jsonExpenseNameArr.length; i++) {
+            var stateArr = new Array();
+            stateArr = jsonExpenseNameArr[i];
+            jsonExpArr.push({
+                id: stateArr.ExpenseNameId,
+                name: stateArr.ExpenseName
+            });
+        }
+    }
+
+    j("#travelExpenseName").select2({
+        data: {
+            results: jsonExpArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: -1,
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    });
+}
+
+function validateTSDetails(exp_date, exp_narration, exp_unit, exp_amt, travelRequestId, exp_name_id, currency_id, travelMode_id, travelCategory_id, cityTown_id) {
+
+    if (travelRequestId == "-1") {
+        alert(window.lang.translate('Travel Request Number is invalid.'));
+        return false;
+    }
+    if (exp_date == "") {
+        alert(window.lang.translate('Expense Date is invalid.'));
+        return false;
+    }
+    if (exp_name_id == "-1") {
+        alert(window.lang.translate('Expense Name is invalid.'));
+        return false;
+    }
+    if (ismodeCategoryJSON.isModeCategory == "Y") {
+        if (travelMode_id == "-1") {
+            alert(window.lang.translate('Mode is invalid.'));
+            return false;
+        }
+        if (travelCategory_id == "-1") {
+            alert(window.lang.translate('Category is invalid.'));
+            return false;
+        }
+    }
+    if (cityTown_id == "-1") {
+        alert(window.lang.translate('City town details is invalid.'));
+        return false;
+    }
+    if (exp_narration == "") {
+        alert(window.lang.translate('Narration is invalid.'));
+        return false;
+    }
+    if (exp_unit != "") {
+        if (isOnlyNumeric(exp_unit, "Unit") == false) {
+            return false;
+        }
+        if (isZero(exp_unit, "Unit") == false) {
+            document.getElementById("expUnit").value = "";
+            return false;
+        }
+    } else {
+        alert(window.lang.translate('Unit is invalid.'));
+        return false;
+    }
+    if (exp_amt != "") {
+        if (isNumber_optionalDot(exp_amt, "Amount") == false) {
+            return false;
+        }
+
+    } else {
+        alert(window.lang.translate('Amount is invalid'));
+        return false;
+    }
+
+    if (currency_id == "-1") {
+        alert(window.lang.translate('Currency Name is invalid.'));
+        return false;
+    }
+    return true;
+}
+
+function createTravelRequestNoDropDown(jsonTravelRequestNoArr) {
+    var jsonRequestArr = [];
+    if (jsonTravelRequestNoArr != null && jsonTravelRequestNoArr.length > 0) {
+        for (var i = 0; i < jsonTravelRequestNoArr.length; i++) {
+            var stateArr = new Array();
+            stateArr = jsonTravelRequestNoArr[i];
+            var requestNo = stateArr.TravelRequestNumber;
+            var title = requestNo.substr(requestNo.length - 3) + "/" + stateArr.Title;
+
+            jsonRequestArr.push({
+                id: stateArr.TravelRequestId,
+                name: title
+            });
+        }
+    }
+
+    j("#travelRequestName").select2({
+        data: {
+            results: jsonRequestArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: -1,
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    });
+}
+
+function oprationOnExpenseClaim() {
+    j(document).ready(function() {
+        if (window.localStorage.getItem("EaInMobile") == "true") {
+            j('#send').on('click', function(e) {
+                expenseClaimDates = new Object;
+                if (requestRunning) {
+                    return;
+                }
+                var accountHeadIdToBeSent = ''
+                if (j("#source tr.selected").hasClass("selected")) {
+                    j("#source tr.selected").each(function(index, row) {
+                        displayEmpAdv();
+
+                    });
+                } else {
+                    alert(window.lang.translate('Tap and select Expenses to send for Approval with server.'));
+                }
+            });
+        } else {
+            j('#send').on('click', function(e) {
+                var jsonExpenseDetailsArr = [];
+                var busExpDetailsArr = [];
+                expenseClaimDates = new Object;
+                if (requestRunning) {
+                    return;
+                }
+                var accountHeadIdToBeSent = ''
+                exceptionMessage = '';
+                if (j("#source tr.selected").hasClass("selected")) {
+                    j("#source tr.selected").each(function(index, row) {
+                        var busExpDetailId = j(this).find('td.busExpId').text();
+                        var jsonFindBE = new Object();
+                        var expDate = j(this).find('td.expDate1').text();
+                        var expenseDate = expDate;
+                        var currentDate = new Date(expenseDate);
+                        //get Start Date
+                        if (!expenseClaimDates.hasOwnProperty('minInDateFormat')) {
+                            expenseClaimDates["minInDateFormat"] = currentDate;
+                            expenseClaimDates["minInStringFormat"] = expenseDate;
+                        } else {
+                            if (expenseClaimDates.minInDateFormat > currentDate) {
+                                expenseClaimDates["minInDateFormat"] = currentDate;
+                                expenseClaimDates["minInStringFormat"] = expenseDate;
+                            }
+                        }
+                        //get End Date
+                        if (!expenseClaimDates.hasOwnProperty('maxInDateFormat')) {
+                            expenseClaimDates["maxInDateFormat"] = currentDate;
+                            expenseClaimDates["maxInStringFormat"] = expenseDate;
+                        } else {
+                            if (expenseClaimDates.maxInDateFormat < currentDate) {
+                                expenseClaimDates["maxInDateFormat"] = currentDate;
+                                expenseClaimDates["maxInStringFormat"] = expenseDate;
+                            }
+                        }
+
+                        jsonFindBE["expenseDate"] = expenseDate;
+                        //get Account Head
+                        var currentAccountHeadID = j(this).find('td.accHeadId').text();
+
+                        if (validateAccountHead() == true) {
+                            accountHeadIdToBeSent = currentAccountHeadID
+
+                            jsonFindBE["accountCodeId"] = j(this).find('td.accountCodeId').text();
+                            jsonFindBE["ExpenseId"] = j(this).find('td.expNameId').text();
+                            jsonFindBE["ExpenseName"] = j(this).find('td.expName').text();
+                            jsonFindBE["fromLocation"] = j(this).find('td.expFromLoc1').text();
+                            jsonFindBE["toLocation"] = j(this).find('td.expToLoc1').text();
+                            jsonFindBE["narration"] = j(this).find('td.expNarration1').text();
+
+                            jsonFindBE["isErReqd"] = j(this).find('td.isErReqd').text();
+                            jsonFindBE["ERLimitAmt"] = j(this).find('td.ERLimitAmt').text();
+
+                            jsonFindBE["perUnitException"] = j(this).find('td.isEntitlementExceeded').text();
+
+                            if (j(this).find('td.expUnit').text() != "") {
+                                jsonFindBE["units"] = j(this).find('td.expUnit').text();
+                            }
+
+                            jsonFindBE["wayPoint"] = j(this).find('td.wayPoint').text();
+
+                            jsonFindBE["amount"] = j(this).find('td.expAmt1').text();
+                            jsonFindBE["currencyId"] = j(this).find('td.currencyId').text();
+
+                            var dataURL = j(this).find('td.busAttachment').text();
+
+                            //For IOS image save
+                            var data = dataURL.replace(/data:image\/(png|jpg|jpeg);base64,/, '');
+
+                            //For Android image save
+                            //var data = dataURL.replace(/data:base64,/, '');
+
+                            jsonFindBE["imageAttach"] = data;
+
+                            jsonFindBE["isEntiLineOrVoucherLevel"] = j(this).find('td.isEntiLineOrVoucherLevel').text();
+                            jsonFindBE["expFixedLimitAmt"] = j(this).find('td.expFixedLimitAmt').text();
+
+                            jsonExpenseDetailsArr.push(jsonFindBE);
+
+                            busExpDetailsArr.push(busExpDetailId);
+                            requestRunning = true;
+
+                        } else {
+                            if (exceptionMessage == '') {
+                                exceptionMessage = "Selected expenses should be mapped under Single Expense Type/Account Head."
+                                    // j('#displayError').children('span').text(exceptionMessage);
+                                    // j('#displayError').hide().fadeIn('slow').delay(3000).fadeOut('slow');
+                                requestRunning = false;
+                                accountHeadIdToBeSent = "";
+                                alert(exceptionMessage);
+
+                            }
+                        }
+                    });
+
+                    if (accountHeadIdToBeSent != "" && busExpDetailsArr.length > 0) {
+                        sendForApprovalBusinessDetails(jsonExpenseDetailsArr, busExpDetailsArr, accountHeadIdToBeSent);
+                    }
+                } else {
+                    alert(window.lang.translate('Tap and select Expenses to send for Approval with server.'));
+                }
+            });
+        }
+
+        j('#delete').on('click', function(e) {
+            var busExpDetailsArr = [];
+            var jsonExpenseDetailsArr = [];
+            expenseClaimDates = new Object;
+
+            var pageRef = defaultPagePath + 'fairClaimTable.html';
+            if (j("#source tr.selected").hasClass("selected")) {
+                j("#source tr.selected").each(function(index, row) {
+                    var busExpDetailId = j(this).find('td.busExpId').text();
+                    busExpDetailsArr.push(busExpDetailId);
+                });
+
+                if (busExpDetailsArr.length > 0) {
+                    for (var i = 0; i < busExpDetailsArr.length; i++) {
+                        var businessExpDetailId = busExpDetailsArr[i];
+                        deleteSelectedExpDetails(businessExpDetailId);
+                    }
+                }
+                j('#mainContainer').load(pageRef);
+            } else {
+                alert(window.lang.translate('Tap and select Expenses to delete.'));
+            }
+        });
+
+        j('#synch').on('click', function(e) {
+            var busExpDetailsArr = [];
+            var jsonExpenseDetailsArr = [];
+            expenseClaimDates = new Object;
+            if (j("#source tr.selected").hasClass("selected")) {
+                j("#source tr.selected").each(function(index, row) {
+                    if (requestRunning) {
+                        return;
+                    }
+                    var busExpDetailId = j(this).find('td.busExpId').text();
+                    var jsonFindBE = new Object();
+                    var expDate = j(this).find('td.expDate1').text();
+                    var expenseDate = expDate;
+                    jsonFindBE["expenseDate"] = expenseDate;
+                    jsonFindBE["accountHeadId"] = j(this).find('td.accHeadId').text();
+                    jsonFindBE["accountCodeId"] = j(this).find('td.accountCodeId').text();
+                    jsonFindBE["expenseId"] = j(this).find('td.expNameId').text();
+                    jsonFindBE["ExpenseName"] = j(this).find('td.expName').text();
+                    jsonFindBE["fromLocation"] = j(this).find('td.expFromLoc1').text();
+                    jsonFindBE["toLocation"] = j(this).find('td.expToLoc1').text();
+                    jsonFindBE["narration"] = j(this).find('td.expNarration1').text();
+                    if (j(this).find('td.expUnit').text() != "") {
+                        jsonFindBE["units"] = j(this).find('td.expUnit').text();
+                    }
+                    jsonFindBE["wayPoint"] = j(this).find('td.wayPoint').text();
+                    jsonFindBE["amount"] = j(this).find('td.expAmt1').text();
+                    jsonFindBE["currencyId"] = j(this).find('td.currencyId').text();
+                    jsonFindBE["perUnitException"] = j(this).find('td.isEntitlementExceeded').text();
+
+                    var dataURL = j(this).find('td.busAttachment').text();
+
+                    //For IOS image save
+                    var data = dataURL.replace(/data:image\/(png|jpg|jpeg);base64,/, '');
+
+                    //For Android image save
+                    //var data = dataURL.replace(/data:base64,/, '');
+
+                    jsonFindBE["imageAttach"] = data;
+
+                    jsonExpenseDetailsArr.push(jsonFindBE);
+
+                    busExpDetailsArr.push(busExpDetailId);
+
+                });
+                if (busExpDetailsArr.length > 0) {
+                    saveBusinessExpDetails(jsonExpenseDetailsArr, busExpDetailsArr);
+                }
+            } else {
+                alert(window.lang.translate('Tap and select Expenses to synch with server.'));
+            }
+        });
+
+        j('#editBE').on('click', function(e) {
+            expPrimaryId();
+        });
+
+    });
+}
+
+function oprationONTravelSettlementExp() {
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    j('#synchTS').on('click', function(e) {
+        var jsonTravelSettlementDetailsArr = [];
+        var travelSettleExpDetailsArr = [];
+        minExpenseClaimDate = new Object;
+        if (j("#source tr.selected").hasClass("selected")) {
+            j("#source tr.selected").each(function(index, row) {
+                if (requestRunning) {
+                    return;
+                }
+                var travelSettleDetailId = j(this).find('td.tsExpId').text();
+                var jsonFindTS = new Object();
+                var expDate = j(this).find('td.expDate1').text();
+
+                var expenseDate = expDate;
+
+                jsonFindTS["expenseDate"] = expenseDate;
+                jsonFindTS["travelRequestId"] = j(this).find('td.travelRequestId').text();
+                jsonFindTS["accountCodeId"] = j(this).find('td.accountCodeId').text();
+                jsonFindTS["expenseId"] = j(this).find('td.expNameId').text();
+                jsonFindTS["ExpenseName"] = j(this).find('td.expName').text();
+                jsonFindTS["travelModeId"] = j(this).find('td.modeId').text();
+                jsonFindTS["travelCategoryId"] = j(this).find('td.categoryId').text();
+                jsonFindTS["cityTownId"] = j(this).find('td.fromcityTownId').text();
+                jsonFindTS["isModeCategory"] = j(this).find('td.isModeCategory').text();
+                jsonFindTS["narration"] = j(this).find('td.expNarration1').text();
+                jsonFindTS["units"] = j(this).find('td.expUnit').text();
+                jsonFindTS["amount"] = j(this).find('td.expAmt1').text();
+                jsonFindTS["currencyId"] = j(this).find('td.currencyId').text();
+
+                var dataURL = j(this).find('td.tsExpAttachment').text();
+                //For IOS image save
+                var data = dataURL.replace(/data:image\/(png|jpg|jpeg);base64,/, '');
+
+                //For Android image save
+                //var data = dataURL.replace(/data:base64,/, '');
+
+                jsonFindTS["imageAttach"] = data;
+
+                jsonTravelSettlementDetailsArr.push(jsonFindTS);
+
+                travelSettleExpDetailsArr.push(travelSettleDetailId);
+            });
+            if (travelSettleExpDetailsArr.length > 0) {
+                saveTravelSettleExpDetails(jsonTravelSettlementDetailsArr, travelSettleExpDetailsArr);
+            }
+        } else {
+            requestRunning = false;
+            alert(window.lang.translate('Tap and select Expenses to synch with server.'));
+        }
+    });
+
+    j('#deleteTS').on('click', function(e) {
+        var travelSettleExpDetailsArr = [];
+
+        var pageRef = defaultPagePath + 'travelSettlementTable.html';
+        if (j("#source tr.selected").hasClass("selected")) {
+            j("#source tr.selected").each(function(index, row) {
+                var travelSettleDetailId = j(this).find('td.tsExpId').text();
+                travelSettleExpDetailsArr.push(travelSettleDetailId);
+            });
+            if (travelSettleExpDetailsArr.length > 0) {
+                for (var i = 0; i < travelSettleExpDetailsArr.length; i++) {
+                    var travelSettleExpDetailId = travelSettleExpDetailsArr[i];
+                    deleteSelectedTSExpDetails(travelSettleExpDetailId);
+                }
+            }
+            j('#mainContainer').load(pageRef);
+            j('#mainHeader').load(headerBackBtn);
+        } else {
+            alert(window.lang.translate('Tap and select Expenses to delete.'));
+        }
+    });
+}
+
+function loaded() {
+    pictureSource = navigator.camera.PictureSourceType;
+    destinationType = navigator.camera.DestinationType;
+}
+
+function onPhotoDataSuccess(imageData) {
+    resetImageData();
+    alert("reset cam :"+fileTempCameraBE);
+     alert("reset gal :"+fileTempGalleryBE);
+    if (voucherType == 'wallet') {
+        smallImageWallet.style.display = 'block';
+        //document.getElementById('imageWallet').files[0] = "data:image/jpeg;base64," + imageData;
+        document.getElementById('imageWallet').setAttribute('src', "data:image/jpeg;base64," + imageData);
+        smallImageWallet.src = "data:image/jpeg;base64," + imageData;
+
+        if (camerastatus == '1') {
+            saveWalletAttachment(0);
+        }
+    } else if (voucherType == 'BE') {
+        smallImageBE.style.display = 'block';
+        fileTempCameraBE = "data:image/jpeg;base64," + imageData;
+        smallImageBE.src = "data:image/jpeg;base64," + imageData;
+        fileTempGalleryBE = "";
+    } else if (voucherType == 'TS') {
+        smallImageTS.style.display = 'block';
+        fileTempCameraTS = "data:image/jpeg;base64," + imageData;
+        smallImageTS.src = "data:image/jpeg;base64," + imageData;
+        fileTempGalleryTS = "";
+    }
+}
+
+function resetImageData() {
+    fileTempCameraBE = "";
+    fileTempCameraTS = "";
+    fileTempGalleryBE = "";
+    fileTempGalleryTS = "";
+}
+
+function resetUpdateImage(){
+    updateAttachment = "";
+}
+
+function capturePhoto(status, voucher_type) {
+
+    voucherType = voucher_type;
+    navigator.camera.getPicture(onPhotoDataSuccess, onFail, {
+        quality: 10,
+        destinationType: 0
+    });
+    camerastatus = status;
+
+}
+
+function onFail(message) {
+
+}
+
+function onPhotoURISuccess(imageURI) {
+    // Uncomment to view the image file URI 
+    // console.log(imageURI);
+    // Get image handle
+    //
+    resetImageData();
+    resetUpdateImage();
+    if (voucherType == 'wallet') {
+        smallImageWallet.style.display = 'block';
+
+        document.getElementById('imageWallet').files[0] = "data:image/jpeg;base64," + imageURI;
+        smallImageWallet.src = "data:image/jpeg;base64," + imageURI;
+
+        if (camerastatus == '1') {
+            saveWalletAttachment(0);
+        }
+    } else if (voucherType == 'BE') {
+        smallImageBE.style.display = 'block';
+        fileTempGalleryBE = "data:image/jpeg;base64," + imageURI;
+
+        smallImageBE.src = "data:image/jpeg;base64," + imageURI;
+        fileTempCameraBE = "";
+    } else if (voucherType == 'TS') {
+        smallImageTS.style.display = 'block';
+
+        fileTempGalleryTS = "data:image/jpeg;base64," + imageURI;
+
+        smallImageTS.src = "data:image/jpeg;base64," + imageURI;
+        fileTempCameraTS = "";
+    }
+
+}
+
+function getPhoto(source, status, voucher_type) {
+    voucherType = voucher_type;
+    // Retrieve image file location from specified source
+    navigator.camera.getPicture(onPhotoURISuccess, onFail, {
+        quality: 10,
+        destinationType: 0,
+        sourceType: source
+    });
+    camerastatus = status;
+
+}
+
+function saveWalletDetails(jsonWalletArr, jsonWalletIDArr) {
+    var walletID;
+    var i = 0;
+    var headerBackBtn = defaultPagePath + 'headerPageForWalletOperation.html';
+    var pageRef = defaultPagePath + 'addToWallet.html';
+    j('#loading_Cat').show();
+    for (i; i < jsonWalletArr.length; i++) {
+        j.ajax({
+            url: window.localStorage.getItem("urlPath") + "WalletReceiptsService",
+            type: 'POST',
+            dataType: 'json',
+            crossDomain: true,
+            data: JSON.stringify(jsonWalletArr[i]),
+            success: function(data) {
+                if (data.SyncStatus == "Success") {
+                    for (var i = 0; i < jsonWalletIDArr.length; i++) {
+                        walletID = jsonWalletIDArr[i];
+                        deleteSelectedWallets(walletID);
+                    }
+                    document.getElementById("wallet_msg").innerHTML = "Selected File synch successfully.";
+                    j('#mainHeader').load(headerBackBtn);
+                    j("#walletSource td.selected").hide();
+                    j('#wallet_msg').hide().fadeIn('slow').delay(3000).fadeOut('slow');
+                    j('#loading_Cat').hide();
+                } else if (data.SyncStatus == "Error") {
+                    document.getElementById("wallet_msg").innerHTML = "Error: Oops something is wrong, Please Contact System Administer";
+                    j('#mainHeader').load(headerBackBtn);
+                    j('#wallet_msg').hide().fadeIn('slow').delay(3000).fadeOut('slow');
+                    j('#loading_Cat').hide();
+                } else if (data.SyncStatus == "Failure") {
+                    document.getElementById("wallet_msg").innerHTML = "File " + data.FileName + " synch fail.";
+                    j('#mainHeader').load(headerBackBtn);
+                    j('#wallet_msg').hide().fadeIn('slow').delay(3000).fadeOut('slow');
+                    j('#loading_Cat').hide();
+                }
+            },
+            error: function(data) {
+                j('#loading_Cat').hide();
+            }
+        });
+    }
+}
+
+function oprationOnWallet() {
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    j('#synchWallet').on('click', function(e) {
+        var jsonWalletArr = [];
+        var jsonWalletIDArr = [];
+        if (j("#walletSource td.selected").hasClass("selected")) {
+            j("#walletSource td.selected").each(function(index, row) {
+                var jsonFindWalletData = new Object();
+                var jsonFindWalletId = new Object();
+                var walletData = j(this).text();
+                jsonFindWalletId = j(this).find('#para').text();
+                //var dataURL =  j(this).find('td.walletattach').text();
+
+                //For IOS image save
+                var data = walletData.replace(/data:image\/(png|jpg|jpeg);base64,/, '');
+                //For Android image save
+                //var data = data.replace(/data:base64,/, '');
+                jsonFindWalletData["fileName"] = "walletFile_" + window.localStorage.getItem("EmployeeId") + "_" + j(this).find('#para').text() + ".jpeg";
+                jsonFindWalletData["fileData"] = data;
+                jsonFindWalletData["employeeId"] = window.localStorage.getItem("EmployeeId");
+                jsonWalletArr.push(jsonFindWalletData);
+                jsonWalletIDArr.push(jsonFindWalletId);
+
+            });
+            if (jsonWalletArr.length > 0) {
+                saveWalletDetails(jsonWalletArr, jsonWalletIDArr);
+            }
+        } else {
+            alert(window.lang.translate('Tap and select My Receipts Wallet to synch with server.'));
+        }
+    });
+}
+
+function hideTRIcons() {
+    if (window.localStorage.getItem("TrRole") == "true") {
+        document.getElementById('CategoryTrRoleID').style.display = "block";
+    } else {
+        document.getElementById('CategoryTrRoleID').style.display = "none";
+    }
+}
+
+function hideBusinessExpense() {
+    if (window.localStorage.getItem("mobileEC") == "true") {
+        document.getElementById('businessExpenseTab').style.display = "block";
+    } else {
+        document.getElementById('businessExpenseTab').style.display = "none";
+    }
+}
+
+function hideTRMenus() {
+    if (window.localStorage.getItem("TrRole") == "true") {
+        document.getElementById('TrRoleID').style.display = "block";
+        document.getElementById('TsRoleID').style.display = "block";
+    } else {
+        document.getElementById('TrRoleID').style.display = "none";
+        document.getElementById('TsRoleID').style.display = "none";
+    }
+}
+
+function validateValidMobileUser() {
+    var pgRef;
+    var headerBackBtn;
+    var jsonToBeSend = new Object();
+    if (window.localStorage.getItem("EmployeeId") != null && (window.localStorage.getItem("UserStatus") == null || window.localStorage.getItem("UserStatus") == 'Valid')) {
+        jsonToBeSend["user"] = window.localStorage.getItem("UserName");
+        jsonToBeSend["pass"] = window.localStorage.getItem("Password");
+        j.ajax({
+            url: window.localStorage.getItem("urlPath") + "ValidateUserWebservice",
+            type: 'POST',
+            dataType: 'json',
+            crossDomain: true,
+            data: JSON.stringify(jsonToBeSend),
+            success: function(data) {
+
+                if (data.Status == 'Success') {
+                    window.lang.change(window.localStorage.getItem("localLanguage"));
+                    setUserStatusInLocalStorage("Valid");
+                    /*if(!data.MobileMapRole){
+                    		window.localStorage.removeItem("MobileMapRole");
+                    	}else{
+                    		window.localStorage.setItem("MobileMapRole",data.MobileMapRole);
+                    	} */
+                } else if (data.Status == 'NoAndroidRole') {
+                    successMessage = data.Message;
+                    headerBackBtn = defaultPagePath + 'expenzingImagePage.html';
+                    pgRef = defaultPagePath + 'loginPage.html';
+                    setUserStatusInLocalStorage("Invalid");
+                    j('#mainHeader').load(headerBackBtn);
+                    j('#mainContainer').load(pgRef, function() {
+                        document.getElementById("loginErrorMsg").innerHTML = successMessage;
+                        j('#loginErrorMsg').hide().fadeIn('slow').delay(4000).fadeOut('slow');
+                        j('#loading').hide();
+                    });
+
+                } else if (data.Status == 'InactiveUser') {
+                    successMessage = data.Message;
+                    headerBackBtn = defaultPagePath + 'expenzingImagePage.html';
+                    pgRef = defaultPagePath + 'loginPage.html';
+                    j('#mainHeader').load(headerBackBtn);
+                    setUserStatusInLocalStorage("Inactive");
+                    resetUserSessionDetails();
+                    j('#mainContainer').load(pgRef, function() {
+                        document.getElementById("loginErrorMsg").innerHTML = successMessage;
+                        j('#loginErrorMsg').hide().fadeIn('slow').delay(4000).fadeOut('slow');
+                        j('#loading').hide();
+                    });
+                } else if (data.Status == 'ChangedUserCredentials') {
+                    successMessage = data.Message;
+                    headerBackBtn = defaultPagePath + 'expenzingImagePage.html';
+                    pgRef = defaultPagePath + 'loginPageResetPswd.html';
+                    setUserStatusInLocalStorage("ResetPswd");
+                    j('#mainHeader').load(headerBackBtn);
+                    j('#mainContainer').load(pgRef, function() {
+                        document.getElementById("loginErrorMsg").innerHTML = successMessage;
+                        j('#loginErrorMsg').hide().fadeIn('slow').delay(4000).fadeOut('slow');
+                        j('#loading').hide();
+                    });
+                }
+
+            },
+            error: function(data) {
+
+            }
+        });
+    }
+}
+
+function attachGoogleSearchBox(component) {
+    if (window.localStorage.getItem("MapProvider") == "GOOGLEMAP") {
+        var searchBox = new google.maps.places.SearchBox(component);
+        searchBox.addListener("places_changed", function() {
+            //alert("here")
+            fromLoc = document.getElementById("expFromLoc").value;
+            toLoc = document.getElementById("expToLoc").value;
+            if (fromLoc.value != '' && toLoc.value != '') {
+                wayPoint = document.getElementById("wayPointunitValue");
+                wayPoint.value = '';
+                calculateAndDisplayRoute();
+                $("a").click(function() {
+                    $(this).fadeIn("fast").attr("href", "#openModal");
+                });
+            }
+        });
+    }
+}
+//************************************** MAPMYINDIA - START **********************************************//
+
+function attachQueryValues(val) {
+
+    if (window.localStorage.getItem("MobileMapRole") == 'true' && window.localStorage.getItem("MapProvider") == "MAPMYINDIA") {
+        var expFromLoc = document.getElementById("expFromLoc").value;
+        var expToLoc = document.getElementById("expToLoc").value;
+        var locationQuery = "";
+        var queryValue = "";
+
+        if (val == 1) {
+            locationQuery = document.getElementById("expFromLoc").value;
+            queryValue = locationQuery;
+            attachMapMyIndiaSearchBox(queryValue, val);
+        } else if (val == 2) {
+            locationQuery = document.getElementById("expToLoc").value;
+            queryValue = locationQuery;
+            attachMapMyIndiaSearchBox(queryValue, val);
+        }
+
+    }
+}
+
+function attachMapMyIndiaSearchBox(query, val) {
+
+    if (query.length >= 5) {
+
+        j.ajax({
+            url: "https://outpost.mapmyindia.com/api/security/oauth/token?grant_type=client_credentials",
+            type: 'POST',
+            contentType: 'application/x-www-form-urlencoded',
+            crossDomain: true,
+            data: jQuery.param({
+                client_id: "gHvaOPpCYTs20dVHSCo9i_zO5UNPDMDAro9HxE01tgY=",
+                client_secret: "c6M8QBqRa6daTwllDT86UmhOM4jFu5t6Nz6rLf8XLTU="
+
+            }),
+            success: function(response) {
+
+                //alert("in success");
+                //alert(response.token_type);
+                tokenType = response.token_type;
+                accessToken = response.access_token;
+                getPlaceData(tokenType, accessToken, query, val);
+
+            },
+            error: function() {
+                alert("Connection not Established.");
+            }
+        });
+    }
+
+}
+
+function getPlaceData(tokenType, accessToken, queryValue, val) {
+    //alert("tokenType,accessToken : "+tokenType + " " + accessToken);
+    var authorization = tokenType + " " + accessToken;
+    var tempurl = "https://cors-escape.herokuapp.com/https://atlas.mapmyindia.com/api/places/search/json?query=" + queryValue + "&location=28.6321438802915%2C77.2173553802915";
+    console.log("url :  " + tempurl);
+    console.log("authorization : " + authorization);
+
+    var settings = {
+        "async": true,
+        "crossDomain": true,
+        "url": "https://cors-anywhere.herokuapp.com/https://atlas.mapmyindia.com/api/places/search/json?query=" + queryValue + "&location=28.6321438802915%2C77.2173553802915",
+        "method": "GET",
+        "headers": {
+            "authorization": authorization,
+            "cache-control": "no-cache"
+        }
+    }
+
+    $.ajax(settings).done(function(response) {
+        setJSONDataLocationField(response, val);
+    });
+
+}
+
+function setJSONDataLocationField(jsondata, val) {
+    //alert(JSON.stringify(jsondata));
+    var div_data = '';
+    $.each(jsondata.suggestedLocations, function(i, obj) {
+
+        div_data = div_data + "<a herf = '' id=" + obj.latitude + "$" + obj.longitude + " value='" + obj.placeName + '-' + obj.placeAddress + "'>" + obj.placeName + '-' + obj.placeAddress + "</a>"
+
+    });
+
+    if (val == 1) {
+        var my_list = document.getElementById("json-datalist");
+        my_list.innerHTML = div_data;
+        //alert("div_data : "+div_data);
+        document.getElementById('json-datalist').style.display = "";
+    } else if (val == 2) {
+        var my_list = document.getElementById("json-datalist1");
+        my_list.innerHTML = div_data;
+        document.getElementById('json-datalist1').style.display = "";
+    }
+
+    if (val == 1) {
+        j("#json-datalist a").click(function() {
+            var value = j(this).text();
+            var id = j(this).attr('id');
+
+            fromLocationWayPoint = id;
+            document.getElementById("expFromLoc").value = value;
+            document.getElementById('json-datalist').style.display = "none";
+            calulateUnitFromLoction();
+        });
+
+        hideDropDownContents();
+
+    } else if (val == 2) {
+        j("#json-datalist1 a").click(function() {
+
+            var value = j(this).text();
+            var id = j(this).attr('id');
+
+            toLocationWayPoint = id;
+            document.getElementById("expToLoc").value = value;
+            document.getElementById('json-datalist1').style.display = "none";
+            calulateUnitFromLoction();
+
+        });
+        hideDropDownContents();
+
+    }
+
+}
+
+function hideDropDownContents() {
+
+    j("#expDate").click(function() {
+        j(".dropdown-content").hide();
+    });
+
+    j("#expToLoc").click(function() {
+        j(".dropdown-content").hide();
+    });
+
+    j("#expFromLoc").click(function() {
+        j(".dropdown-content").hide();
+    });
+}
+
+function calulateUnitFromLoction() {
+
+    if (fromLocationWayPoint != '' && toLocationWayPoint != '') {
+        if (fromLocationWayPoint.includes("$") && toLocationWayPoint.includes("$")) {
+            var fromLongLat = fromLocationWayPoint.split('$');
+            var fromLat = fromLongLat[0];
+            var fromLong = fromLongLat[1];
+
+            var toLongLat = toLocationWayPoint.split('$');
+            var toLat = toLongLat[0];
+            var toLong = toLongLat[1];
+
+            var settings = {
+                "async": true,
+                "crossDomain": true,
+                "url": "https://apis.mapmyindia.com/advancedmaps/v1/bemzvgf9d3at3j7rt85bpvmwuhaumd59/distance?center=" + fromLat + "," + fromLong + "&pts=" + toLat + "," + toLong + "",
+                "method": "GET",
+                "headers": {
+                    "cache-control": "no-cache"
+                }
+            }
+
+            $.ajax(settings).done(function(response) {
+                wayPoint = document.getElementById("wayPointunitValue");
+                var data = {};
+                data.start = {
+                    'lat': fromLat + '$' + fromLong
+                }
+                data.end = {
+                    'lat': toLat + '$' + toLong
+                }
+                var str = JSON.stringify(data);
+                wayPoint.value = str;
+
+                setUnitBasedOnResponse(response)
+            });
+
+        } else {
+            unitValue = document.getElementById("expUnit");
+            unitValue.value = '';
+        }
+    } else {
+        unitValue = document.getElementById("expUnit");
+        unitValue.value = '';
+    }
+}
+
+function setUnitBasedOnResponse(response) {
+    console.log(JSON.stringify(response));
+
+    $.each(response.results, function(i, obj) {
+        var units = obj.length;
+        var unitKM = parseInt(units) / 1000;
+        unitValue = document.getElementById("expUnit");
+        unitValue.value = unitKM;
+    });
+    returnUnitResult();
+}
+
+//************************************** MAPMYINDIA - END **********************************************//
+
+function viewMap() {
+    if (window.localStorage.getItem("MapProvider") == "GOOGLEMAP") {
+        document.getElementById("openModal").style.display = "block";
+        fromLoc = document.getElementById("expFromLoc");
+        toLoc = document.getElementById("expToLoc");
+        unitValue = document.getElementById("expUnit");
+        wavepoint = document.getElementById("wayPointunitValue");
+        if (fromLoc.value != '' && toLoc.value != '') {
+            calculateAndDisplayRoute();
+            document.getElementById("mapImage").setAttribute('disabled', false);
+        }
+    }
+}
+
+function calculateAndDisplayRoute() {
+    //alert("calculateAndDisplayRoute")
+    var map;
+    var directionsDisplay;
+    var directionsService;
+
+    map = new google.maps.Map(document.getElementById("map"), {
+        center: {
+            lat: 19.122272,
+            lng: 72.863623
+        },
+        zoom: 13
+    });
+    directionsService = new google.maps.DirectionsService;
+    // Create a renderer for directions and bind it to the map.
+    directionsDisplay = new google.maps.DirectionsRenderer({
+        draggable: true,
+        map: map
+    });
+
+    fromLoc = document.getElementById("expFromLoc");
+    //alert("fromLoc   "+fromLoc.value)
+    toLoc = document.getElementById("expToLoc");
+    //alert("toLoc   "+toLoc.value)
+    unitValue = document.getElementById("expUnit");
+    //alert("unitValue   "+unitValue.value)
+    wayPoint = document.getElementById("wayPointunitValue");
+    //alert("wayPoint   "+wayPoint.value)
+    directionsDisplay.addListener('directions_changed', function() {
+        computeTotalDistance(directionsDisplay.getDirections());
+    });
+    var points = [];
+
+    if (fromLoc != null && toLoc != null) {
+        if (wayPoint != null && wayPoint.value != "") {
+            var os = j.parseJSON(wayPoint.value);
+            for (var i = 0; i < os.waypoints.length; i++)
+                points[i] = {
+                    'location': new google.maps.LatLng(os.waypoints[i][0], os.waypoints[i][1]),
+                    'stopover': false
+                }
+        }
+
+        directionsService.route({
+            origin: fromLoc.value,
+            destination: toLoc.value,
+            travelMode: google.maps.TravelMode.DRIVING,
+            waypoints: points
+        }, function(response, status) {
+            // Route the directions and pass the response to a function
+            // to create
+            // markers for each step.
+            if (status === google.maps.DirectionsStatus.OK) {
+                directionsDisplay.setDirections(response);
+
+            } else {
+                unitValue.value = 'NA';
+                wayPoint.value = '';
+            }
+        });
+    }
+
+}
+
+function computeTotalDistance(result) {
+    unitValue = document.getElementById("expUnit");
+    busExpNameIdObj = document.getElementById("expenseName");
+    wayPoint = document.getElementById("wayPointunitValue");
+
+    var total = 0;
+    var myroute = result.routes[0];
+    for (var i = 0; i < myroute.legs.length; i++) {
+        total += myroute.legs[i].distance.value;
+    }
+    total = total / 1000;
+    unitValue.value = Math.round(total);
+    var w = [],
+        wp;
+    var data = {};
+    var rleg = myroute.legs[0];
+    data.start = {
+        'lat': rleg.start_location.lat(),
+        'lng': rleg.start_location.lng()
+    }
+    data.end = {
+        'lat': rleg.end_location.lat(),
+        'lng': rleg.end_location.lng()
+    }
+    var wp = rleg.via_waypoints
+    for (var i = 0; i < wp.length; i++) {
+        w[i] = [wp[i].lat(), wp[i].lng()]
+    }
+    data.waypoints = w;
+    var str = JSON.stringify(data);
+    wayPoint.value = str;
+
+    //var grId = document.forms[0]["gradeId"].value;
+    returnUnitResult();
+}
+
+function closeMap() {
+    document.getElementById('openModal').style.display = "none";
+}
+
+function returnUnitResult() {
+    var perUnitStatus = perUnitDetailsJSON.expRatePerUnit;
+    var fixedOrVariable = perUnitDetailsJSON.expFixedOrVariable;
+    var ratePerUnit = document.getElementById("ratePerUnit");
+    if (flagForUnitEnable == true) {
+        unt = document.getElementById("expUnit");
+        amt = document.getElementById("expAmt");
+        document.getElementById("expAmt").value = parseFloat(Math.round(parseFloat(unt.value)) * parseFloat(ratePerUnit.value));
+        checkPerUnitExceptionStatusForBEAtLineLevel();
+    }
+}
+
+function loadImage() {
+    //alert(window.localStorage.getItem("MobileMapRole"))
+    if (window.localStorage.getItem("MobileMapRole") == 'true') {
+        document.getElementById("mapImage").style.display = "";
+        //document.getElementById("mapLink").style.visibility = "hidden";
+        $("a").click(function() {
+            $(this).fadeTo("fast").removeAttr("href");
+        });
+    }
+}
+
+function resetUnit() {
+    document.getElementById("expUnit").value = "";
+    document.getElementById("expAmt").value = "";
+}
+
+function setNarration() {
+    document.getElementById("expNarration").value = document.getElementById("expDate").value + "--" + document.getElementById("expFromLoc").value + "--" + document.getElementById("expToLoc").value;
+    document.getElementById("expNarration").style.textOverflow = "ellipsis";
+}
+
+//Index.js   changes by Dinesh
+function createReqAdvance() {
+    var pageRef = defaultPagePath + 'addToRequestAdvs.html';
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+//Index.js   changes by Dinesh end
+
+//amit index.js changes start
+function createAdvanceTypeDropDown(jsonAdvanceTypeArr) {
+    var jsonArr = [];
+    if (jsonAdvanceTypeArr != null && jsonAdvanceTypeArr.length > 0) {
+        for (var i = 0; i < jsonAdvanceTypeArr.length; i++) {
+            var stateArr = new Array();
+            stateArr = jsonAdvanceTypeArr[i];
+            jsonArr.push({
+                id: stateArr.Value,
+                name: stateArr.Label
+            });
+        }
+    }
+
+    j("#empAdvType").select2({
+        data: {
+            results: jsonArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: -1,
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    });
+    var DefaultAdvType = window.localStorage.getItem("DefaultAdvType");
+    //j("#empAdvType").select2("val",DefaultAdvType);
+}
+
+function changeAdavanceType() {
+
+    var advTypeID = j("#empAdvType").select2('data').id;
+    //getAdvanceTypeFromDB(advTypeID);
+    populateEATitle();
+}
+
+function createAccountHeadDropDown(jsonAccountHeadArr) {
+    var jsonArr = [];
+    if (jsonAccountHeadArr != null && jsonAccountHeadArr.length > 0) {
+        for (var i = 0; i < jsonAccountHeadArr.length; i++) {
+            var stateArr = new Array();
+            stateArr = jsonAccountHeadArr[i];
+
+            jsonArr.push({
+                id: stateArr.Value,
+                name: stateArr.Label
+            });
+        }
+    }
+
+    j("#empAdvAccHead").select2({
+        data: {
+            results: jsonArr,
+            text: 'name'
+        },
+        minimumResultsForSearch: -1,
+        formatResult: function(result) {
+            if (!isJsonString(result.id))
+                result.id = JSON.stringify(result.id);
+            return result.name;
+        }
+    });
+    var DefaultAccontHead = window.localStorage.getItem("DefaultAccontHead");
+    j("#empAdvAccHead").select2("val", DefaultAccontHead);
+}
+
+function changeAccountHeadName() {
+
+    var acHeadID = j("#empAdvAccHead").select2('data').id;
+    // getAccountHeadFromDB(acHeadID);
+}
+
+function syncSubmitEmpAdvance() {
+
+    var empAdvDate = document.getElementById('empAdvDate').value;
+    var empAdvTitle = document.getElementById('empAdvTitle').value;
+    var empAdvjustification = document.getElementById('empAdvjustification').value;
+    var empAdvAmount = document.getElementById('empAdvAmount').value;
+    var empAdvType_id;
+    var empAdvType_Name;
+    var empAccHead_id;
+    var empAccHead_Name;
+
+    if (j("#empAdvType").select2('data') != null) {
+        empAdvType_id = j("#empAdvType").select2('data').id;
+        empAdvType_Name = j("#empAdvType").select2('data').name;
+    } else {
+        empAdvType_id = '-1';
+    }
+
+    if (j("#empAdvAccHead").select2('data') != null) {
+        empAccHead_id = j("#empAdvAccHead").select2('data').id;
+        empAccHead_Name = j("#empAdvAccHead").select2('data').name;
+    } else {
+        empAccHead_id = '-1';
+    }
+
+    if (validateEmpAdvanceDetails(empAdvDate, empAdvTitle, empAdvjustification, empAdvAmount, empAdvType_id, empAdvType_Name, empAccHead_id, empAccHead_Name)) {
+
+        var jsonToSaveEA = new Object();
+        j('#loading_Cat').show();
+        jsonToSaveEA["EmployeeId"] = window.localStorage.getItem("EmployeeId");;
+        jsonToSaveEA["BudgetingStatus"] = window.localStorage.getItem("BudgetingStatus");;
+        jsonToSaveEA["empAdvDate"] = empAdvDate;
+        jsonToSaveEA["empAdvTitle"] = empAdvTitle;
+        jsonToSaveEA["empAdvjustification"] = empAdvjustification;
+        jsonToSaveEA["empAdvAmount"] = empAdvAmount;
+        jsonToSaveEA["empAdvType_id"] = empAdvType_id;
+        jsonToSaveEA["empAccHead_id"] = empAccHead_id;
+
+        saveEmployeeAdvanceAjax(jsonToSaveEA);
+    } else {
+        return false;
+    }
+
+}
+
+function saveEmployeeAdvanceAjax(jsonToSaveEA) {
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    var pageRefSuccess = defaultPagePath + 'success.html';
+    var pageRefFailure = defaultPagePath + 'failure.html';
+    j.ajax({
+        url: window.localStorage.getItem("urlPath") + "SyncSubmitEmployeeAdvanceDetail",
+        type: 'POST',
+        dataType: 'json',
+        crossDomain: true,
+        data: JSON.stringify(jsonToSaveEA),
+        success: function(data) {
+            if (data.Status == "Success") {
+                successMessage = data.Message;
+                requestRunning = false;
+                j('#loading_Cat').hide();
+                j('#mainHeader').load(headerBackBtn);
+                j('#mainContainer').load(pageRefSuccess);
+
+            } else if (data.Status == "Failure") {
+                successMessage = data.Message;
+                requestRunning = false;
+                j('#loading_Cat').hide();
+                j('#mainHeader').load(headerBackBtn);
+                j('#mainContainer').load(pageRefFailure);
+            } else {
+                j('#loading_Cat').hide();
+                successMessage = "Oops!! Something went wrong. Please contact system administrator.";
+                j('#mainHeader').load(headerBackBtn);
+                j('#mainContainer').load(pageRefFailure);
+            }
+        },
+        error: function(data) {
+            j('#loading_Cat').hide();
+            requestRunning = false;
+            alert(window.lang.translate('Error: Oops something is wrong, Please Contact System Administer'));
+        }
+    });
+}
+
+function validateEmpAdvanceDetails(empAdvDate, empAdvTitle, empAdvjustification, empAdvAmount, empAdvType_id, empAdvType_Name, empAccHead_id, empAccHead_Name) {
+
+    if (empAdvDate == "") {
+        alert(window.lang.translate('Advance Date is required'));
+        return false;
+    }
+    if (empAdvTitle == "") {
+        alert(window.lang.translate('Advance Title is required'));
+        return false;
+    }
+    if (empAdvjustification == "") {
+        alert(window.lang.translate('Justification is required'));
+        return false;
+    }
+    if (empAdvAmount == "") {
+        alert(window.lang.translate('Amount is required'));
+        return false;
+    }
+
+    if (empAdvAmount != "") {
+        if (isOnlyNumeric(empAdvAmount, "Amount") == false) {
+            document.getElementById("empAdvAmount").value = "";
+            return false;
+        }
+
+    } else {
+        alert(window.lang.translate('Amount is invalid'));
+        return false;
+    }
+
+    if (isZero(empAdvAmount, "Amount") == false) {
+        document.getElementById("empAdvAmount").value = "";
+        return false;
+    }
+
+    if (empAdvType_id == "-1" || empAdvType_id == "") {
+        alert(window.lang.translate('Advance Type is invalid'));
+        return false;
+    }
+    if (empAccHead_id == "-1" || empAccHead_id == "") {
+        alert(window.lang.translate('Expense Type is invalid'));
+        return false;
+    }
+
+    return true;
+}
+
+function displayEmpAdvanceExp() {
+    var headerBackBtn = defaultPagePath + 'headerPageForBEOperation.html';
+    var pageRef = defaultPagePath + 'availableEmpAdvance.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+function hideEAIcons() {
+    if (window.localStorage.getItem("EaInMobile") == "true") {
+        document.getElementById('CategoryEAId').style.display = "block";
+    } else {
+        document.getElementById('CategoryEAId').style.display = "none";
+    }
+}
+
+function hideEAMenus() {
+    if (window.localStorage.getItem("EaInMobile") == "true") {
+        document.getElementById('EaDisplayID').style.display = "block";
+    } else {
+        document.getElementById('EaDisplayID').style.display = "none";
+    }
+}
+
+function hideEmployeeAdvance() {
+    if (window.localStorage.getItem("EaInMobile") == "true") {
+        fetchEmployeeAdvance();
+        document.getElementById('helpimage').style.display = "";
+        //document.getElementById('EA').style.display="";
+    } else {
+        fetchExpenseClaim();
+        document.getElementById('helpimage').style.display = "none";
+        document.getElementById('EA').style.display = "none";
+    }
+}
+
+function populateBEAmount() {
+    var BEAmount = 0;
+    var convAmount = 0;
+    if (j("#source tr.selected").hasClass("selected")) {
+        j("#source tr.selected").each(function(index, row) {
+            var Amount = j(this).find('td.expAmt1').text();
+
+            var convRate = j(this).find('td.conversionRate').text();
+            //get Amount 
+            convAmount = parseFloat(Amount) * parseFloat(Math.round(convRate * 100) / 100);
+            BEAmount = parseFloat(BEAmount) + parseFloat(Math.round(convAmount * 100) / 100);
+        });
+
+        if (BEAmount != "") {
+            document.getElementById("totalAmount").value = BEAmount;
+        }
+    } else {
+        document.getElementById("totalAmount").value = "";
+    }
+}
+
+function populateEAAmount() {
+    var EAAmount = 0;
+    if (j("#source1 tr.selected").hasClass("selected")) {
+        j("#source1 tr.selected").each(function(index, row) {
+            var Amount = j(this).find('td.Amount').text();
+            //get Amount 
+            EAAmount = parseFloat(EAAmount) + parseFloat(Amount);
+        });
+
+        if (EAAmount != "") {
+            document.getElementById("unsetAdvAmount").value = EAAmount;
+        }
+    } else {
+        document.getElementById("unsetAdvAmount").value = "";
+    }
+}
+
+function calculateAmount() {
+    var beAmount = 0
+    var eaAmount = 0
+    beAmount = document.getElementById("totalAmount").value;
+    eaAmount = document.getElementById("unsetAdvAmount").value;
+
+    if (beAmount != "" && beAmount != 0 && eaAmount != "" && eaAmount != 0) {
+        if (parseFloat(beAmount) > parseFloat(eaAmount)) {
+            document.getElementById("refundToEmp").value = parseFloat(beAmount) - parseFloat(eaAmount);
+            document.getElementById("recoverFromEmp").value = "0";
+        } else if (parseFloat(eaAmount) > parseFloat(beAmount)) {
+            document.getElementById("recoverFromEmp").value = parseFloat(eaAmount) - parseFloat(beAmount);
+            document.getElementById("refundToEmp").value = "0";
+        } else {
+            document.getElementById("refundToEmp").value = "0";
+            document.getElementById("recoverFromEmp").value = "0";
+        }
+    } else {
+        document.getElementById("refundToEmp").value = "0";
+        document.getElementById("recoverFromEmp").value = "0";
+    }
+}
+
+function displayEmpAdv() {
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    var pageRef = defaultPagePath + 'fairClaimTable.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+    });
+    document.getElementById('BE').style.display = "none";
+    document.getElementById('EA').style.display = "";
+    document.getElementById('helpimage').style.display = "none";
+    appPageHistory.push(pageRef);
+}
+
+function submitBEWithEA() {
+    var jsonExpenseDetailsArr = [];
+    var busExpDetailsArr = [];
+    var jsonEmplAdvanceArr = [];
+    var emplAdvanceDetailsArr = [];
+    expenseClaimDates = new Object;
+    if (requestRunning) {
+        return;
+    }
+    var accountHeadIdToBeSent = ''
+    exceptionMessage = '';
+    if (j("#source tr.selected").hasClass("selected")) {
+        j("#source tr.selected").each(function(index, row) {
+            var busExpDetailId = j(this).find('td.busExpId').text();
+            var jsonFindBE = new Object();
+            var expDate = j(this).find('td.expDate1').text();
+            var expenseDate = expDate;
+            var currentDate = new Date(expenseDate);
+            //get Start Date
+            if (!expenseClaimDates.hasOwnProperty('minInDateFormat')) {
+                expenseClaimDates["minInDateFormat"] = currentDate;
+                expenseClaimDates["minInStringFormat"] = expenseDate;
+            } else {
+                if (expenseClaimDates.minInDateFormat > currentDate) {
+                    expenseClaimDates["minInDateFormat"] = currentDate;
+                    expenseClaimDates["minInStringFormat"] = expenseDate;
+                }
+            }
+            //get End Date
+            if (!expenseClaimDates.hasOwnProperty('maxInDateFormat')) {
+                expenseClaimDates["maxInDateFormat"] = currentDate;
+                expenseClaimDates["maxInStringFormat"] = expenseDate;
+            } else {
+                if (expenseClaimDates.maxInDateFormat < currentDate) {
+                    expenseClaimDates["maxInDateFormat"] = currentDate;
+                    expenseClaimDates["maxInStringFormat"] = expenseDate;
+                }
+            }
+
+            jsonFindBE["expenseDate"] = expenseDate;
+            //get Account Head
+            var currentAccountHeadID = j(this).find('td.accHeadId').text();
+
+            if (validateAccountHead() == true) {
+                accountHeadIdToBeSent = currentAccountHeadID
+
+                jsonFindBE["accountCodeId"] = j(this).find('td.accountCodeId').text();
+                jsonFindBE["ExpenseId"] = j(this).find('td.expNameId').text();
+                jsonFindBE["ExpenseName"] = j(this).find('td.expName').text();
+                jsonFindBE["fromLocation"] = j(this).find('td.expFromLoc1').text();
+                jsonFindBE["toLocation"] = j(this).find('td.expToLoc1').text();
+                jsonFindBE["narration"] = j(this).find('td.expNarration1').text();
+
+                jsonFindBE["isErReqd"] = j(this).find('td.isErReqd').text();
+                jsonFindBE["ERLimitAmt"] = j(this).find('td.ERLimitAmt').text();
+
+                jsonFindBE["perUnitException"] = j(this).find('td.isEntitlementExceeded').text();
+
+                if (j(this).find('td.expUnit').text() != "") {
+                    jsonFindBE["units"] = j(this).find('td.expUnit').text();
+                }
+
+                jsonFindBE["wayPoint"] = j(this).find('td.wayPoint').text();
+
+                jsonFindBE["amount"] = j(this).find('td.expAmt1').text();
+                jsonFindBE["currencyId"] = j(this).find('td.currencyId').text();
+
+                var dataURL = j(this).find('td.busAttachment').text();
+
+                //For IOS image save
+                var data = dataURL.replace(/data:image\/(png|jpg|jpeg);base64,/, '');
+
+                //For Android image save
+                //var data = dataURL.replace(/data:base64,/, '');
+
+                jsonFindBE["isEntiLineOrVoucherLevel"] = j(this).find('td.isEntiLineOrVoucherLevel').text();
+                jsonFindBE["expFixedLimitAmt"] = j(this).find('td.expFixedLimitAmt').text();
+
+                jsonFindBE["imageAttach"] = data;
+
+                jsonExpenseDetailsArr.push(jsonFindBE);
+
+                busExpDetailsArr.push(busExpDetailId);
+                requestRunning = true;
+
+            } else {
+                if (exceptionMessage == '') {
+                    exceptionMessage = "Selected expenses should be mapped under Single Expense Type/Account Head."
+                        //j('#displayError').children('span').text(exceptionMessage);
+                        //j('#displayError').hide().fadeIn('slow').delay(3000).fadeOut('slow');
+                        // j('#displayError').children('span').text("Selected expenses should be mapped under Single Expense Type/Account Head.");
+                    requestRunning = false;
+                    accountHeadIdToBeSent = "";
+                    alert(exceptionMessage);
+                }
+
+            }
+        });
+
+        if (j("#source1 tr.selected").hasClass("selected")) {
+            j("#source1 tr.selected").each(function(index, row) {
+                var jsonFindEA = new Object();
+                jsonFindEA["empAdvID"] = j(this).find('td.empAdvID').text();
+                jsonFindEA["emplAdvVoucherNo"] = j(this).find('td.emplAdvVoucherNo').text();
+                jsonFindEA["empAdvTitle"] = j(this).find('td.empAdvTitle').text();
+                jsonFindEA["Amount"] = j(this).find('td.Amount').text();
+                emplAdvanceDetailsArr.push(j(this).find('td.empAdvID').text());
+                jsonEmplAdvanceArr.push(jsonFindEA);
+            });
+
+        }
+
+        if (accountHeadIdToBeSent != "" && busExpDetailsArr.length > 0) {
+            sendForApprovalBusinessDetailsWithEa(jsonExpenseDetailsArr, jsonEmplAdvanceArr, busExpDetailsArr, emplAdvanceDetailsArr, accountHeadIdToBeSent);
+        }
+    } else {
+        alert(window.lang.translate('Tap and select Expenses to send for Approval with server.'));
+    }
+
+}
+
+function sendForApprovalBusinessDetailsWithEa(jsonBEArr, jsonEAArr, busExpDetailsArr, empAdvArr, accountHeadID) {
+    var jsonToSaveBE = new Object();
+    var totalAmount = 0;
+    var unsetAdvAmount = 0;
+    var refundToEmp = 0;
+    var recoverFromEmp = 0;
+
+    totalAmount = document.getElementById("totalAmount").value;
+    unsetAdvAmount = document.getElementById("unsetAdvAmount").value;
+    refundToEmp = document.getElementById("refundToEmp").value;
+    recoverFromEmp = document.getElementById("recoverFromEmp").value;
+
+    jsonToSaveBE["employeeId"] = window.localStorage.getItem("EmployeeId");
+    jsonToSaveBE["expenseDetails"] = jsonBEArr;
+    jsonToSaveBE["totalAmount"] = totalAmount;
+    jsonToSaveBE["unsetAdvAmount"] = unsetAdvAmount;
+    jsonToSaveBE["refundToEmp"] = refundToEmp;
+    jsonToSaveBE["recoverFromEmp"] = recoverFromEmp;
+    jsonToSaveBE["employeeAdvDeatils"] = jsonEAArr;
+    jsonToSaveBE["startDate"] = expenseClaimDates.minInStringFormat;
+    jsonToSaveBE["endDate"] = expenseClaimDates.maxInStringFormat;
+    jsonToSaveBE["DelayAllowCheck"] = false;
+    jsonToSaveBE["BudgetingStatus"] = window.localStorage.getItem("BudgetingStatus");
+    jsonToSaveBE["accountHeadId"] = accountHeadID;
+    jsonToSaveBE["ProcessStatus"] = "1";
+    jsonToSaveBE["title"] = window.localStorage.getItem("FirstName") + "/" + jsonToSaveBE["startDate"] + " to " + jsonToSaveBE["endDate"];
+
+    var pageRefSuccess = defaultPagePath + 'success.html';
+    var pageRefFailure = defaultPagePath + 'failure.html';
+    callSendForApprovalServiceForBEwithEA(jsonToSaveBE, busExpDetailsArr, empAdvArr, pageRefSuccess, pageRefFailure);
+
+}
+
+function callSendForApprovalServiceForBEwithEA(jsonToSaveBE, busExpDetailsArr, empAdvArr, pageRefSuccess, pageRefFailure) {
+    j('#loading_Cat').show();
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+
+    var status = validateExpenseAmtForVoucher(jsonToSaveBE);
+
+    if (status == true) {
+
+        validateMontlyAmtForVoucherForBEWithEA(jsonToSaveBE, busExpDetailsArr, empAdvArr, pageRefSuccess, pageRefFailure);
+
+    } else {
+        j('#loading_Cat').hide();
+        requestRunning = false;
+    }
+}
+
+function openNav() {
+    document.getElementById("mySidenav").style.width = "230px";
+}
+
+function closeNav() {
+    //document.getElementById("mySidenav").style.width = "0";
+}
+
+function addHeader() {
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+    });
+}
+
+function fetchBusiEmpAdv() {
+    if (window.localStorage.getItem("EaInMobile") == "true") {
+        fetchBusinessExpNdEmployeeAdv();
+        document.getElementById('helpimage').style.display = "";
+        //document.getElementById('EA').style.display="";
+    } else {
+        fetchExpenseClaimFromMain();
+        document.getElementById('helpimage').style.display = "none";
+        document.getElementById('EA').style.display = "none";
+    }
+}
+
+function createBusiExpMain() {
+    resetImageData();
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    var pageRef = defaultPagePath + 'businessExpenseMainPage.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+function createTravelMain() {
+    resetImageData();
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    var pageRef = defaultPagePath + 'travelMainPage.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+function viewVouchers() {
+    resetImageData();
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    var pageRef = defaultPagePath + 'viewApproverVouchers.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+function viewPastVouchers() {
+    resetImageData();
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    var pageRef = defaultPagePath + 'viewApproverPastVouchers.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+
+
+function onloadDefaultValue() {
+    clickedFlagCar = false;
+    clickedFlagTicket = false;
+    clickedFlagHotel = false;
+}
+
+// changes for sms app
+function createSMS() {
+
+    var headerBackBtn = defaultPagePath + 'headerPageForWalletOperation.html';
+    var pageRef = defaultPagePath + 'sms.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+function initApp() {
+    updateStatus('init app called');
+    if (!SMS) {
+        alert('SMS plugin not ready');
+        return;
+    }
+    updateStatus('SMS count: ' + smsList.length);
+    document.addEventListener('onSMSArrive', function(e) {
+        saveIncomingSMSOnLocal(e);
+    }, false);
+    alert('end of init');
+}
+
+function createEWallet() {
+
+    var headerBackBtn = defaultPagePath + 'headerPageForSMSOperation.html';
+    var pageRef = defaultPagePath + 'eWalletOptions.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+function viewMessages() {
+    /*var e = { "data" : {"address": "paytm", "body":"You have made payment of Rs.135.00 to om rest.", "date_sent":1482401219880}}
+     saveIncomingSMSOnLocal(e);
+     var e1 = { "data" : {"address": "freecharge", "body":"Recharge of BSNL mobile for Rs.54 was successful. operator refrence number is 0154324", "date_sent":1482601219880}}
+     saveIncomingSMSOnLocal(e1);
+     var e2 = { "data" : {"address": "uber", "body":"You paid uber Rs.134.65 with your paytm wallet. reference number for the transaction is 93123a24", "date_sent":1482701219880}}
+     saveIncomingSMSOnLocal(e2);
+     var e3 = { "data" : {"address": "paytm", "body":"Hi,  your order #142592342342 of Rs. 2490 for 2 items is successful. we will let you know once seller ships it.", "date_sent":1482201219880}}
+     saveIncomingSMSOnLocal(e3);
+     var e4 = { "data" : {"address": "Creditcard", "body":"hi, payment of your electricity bill was successful for Rs.987.", "date_sent":1482101219880}}
+     saveIncomingSMSOnLocal(e4);*/
+
+    //console.log("viewMessages  "+filtersStr)
+    var headerBackBtn = defaultPagePath + 'headerPageForSMSOperation.html';
+    var pageRef = defaultPagePath + 'fairMessageTable.html';
+    j(document).ready(function() {
+        setTimeout(function() {
+            j('#mainHeader').load(headerBackBtn);
+            j('#mainContainer').load(pageRef);
+        }, 500);
+    });
+    appPageHistory.push(pageRef);
+    j('#loading_Cat').hide();
+}
+
+function getFormattedDateFromMillisec(input) {
+
+    var time = new Date(input);
+    var theyear = time.getFullYear();
+    var themonth = time.getMonth() + 1;
+    var thetoday = time.getDate();
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    return thetoday + "-" + months[(themonth - 1)] + "-" + theyear;
+}
+
+function saveIncomingSMSOnLocal(e) {
+    var sms = e.data;
+    smsList.push(sms);
+    // console.log(sms);
+    var senderAddress = "" + sms.address;
+    senderAddress = senderAddress.toLowerCase();
+    if (senderAddress.includes("paytm") || senderAddress.includes("freecharge") || senderAddress.includes("uber") || senderAddress.includes("Creditcard")) {
+        // console.log("inside if condition")
+        if (smsFilterBox(sms.body))
+            saveSMS(sms);
+    }
+}
+
+function startWatch() {
+    if (SMS) SMS.startWatch(function() {
+        window.localStorage.setItem("smsWatchStatus", true);
+        //smsWatchFlagStatus = true;
+        //alert(updateStrForSMS+'watching started'); 
+    }, function() {
+        window.localStorage.setItem("smsWatchStatus", false);
+        //smsWatchFlagStatus = false ;
+        //alert(updateStrForSMS+'failed to start watching');
+    });
+}
+
+function parseIncomingSMSForAmount(input) {
+    var amount = "";
+    if (input.includes("Rs.")) {
+        var msg = input.split("Rs.")
+
+        var test = msg[1];
+        var rsExtractStr = test.trim().split(" ");
+        amount = rsExtractStr[0];
+    }
+    return amount;
+}
+
+function operationsOnSMS() {
+    j(document).ready(function() {
+        j('#discard').on('click', function(e) {
+            if (requestRunning) {
+                return;
+            }
+            var pageRef = defaultPagePath + 'fairMessageTable.html';
+            if (j("#source tr.selected").hasClass("selected")) {
+                j("#source tr.selected").each(function(index, row) {
+                    requestRunning = true;
+                    var smsID = j(this).find('td.smsId').text();
+                    discardMessages(smsID);
+                    j('#mainContainer').load(pageRef);
+                    var SMSSuccessMsgForDelete = "message/s deleted successfully.";
+                    document.getElementById("syncSuccessMsg").innerHTML = SMSSuccessMsgForDelete;
+                    j('#syncSuccessMsg').hide().fadeIn('slow').delay(3000).fadeOut('slow');
+                    requestRunning = false;
+                });
+            } else {
+                alert("Tap and select messages for save.");
+            }
+        });
+
+    });
+
+    j('#saveSMS').on('click', function(e) {
+        if (requestRunning) {
+            return;
+        }
+        var pageRef = defaultPagePath + 'smsToExpense.html';
+        if (j("#source tr.selected").hasClass("selected")) {
+            j("#source tr.selected").each(function(index, row) {
+                requestRunning = true;
+                var smsID = j(this).find('td.smsId').text();
+                var smsText = j(this).find('td.smsText').text();
+                var smsSentDate = j(this).find('td.smsSentDate').text();
+                var smsAmount = j(this).find('td.smsAmount').text();
+                smsToExpenseStr = smsID + "_" + smsText + "_" + smsSentDate + "_" + smsAmount;
+                discardMessages(smsID);
+                j('#mainContainer').load(pageRef);
+                //  console.log("inside of save header btn click mthd "+smsToExpenseStr)
+                //  var SMSSuccessMsgForDelete="message/s deleted successfully.";
+                // document.getElementById("syncSuccessMsg").innerHTML = SMSSuccessMsgForDelete;
+                // j('#syncSuccessMsg').hide().fadeIn('slow').delay(3000).fadeOut('slow');
+                requestRunning = false;
+            });
+        } else {
+            alert("Tap and select messages for save.");
+        }
+    });
+}
+
+function smsFilterBox(smsText) {
+    var filtersStr = window.localStorage.getItem("SMSFilterationStr");
+    //console.log("filtersStr  "+filtersStr)
+    var blockedWordsStr = filtersStr.split("@")[0];
+    var allowedWordsStr = filtersStr.split("@")[1];
+    var returnFlag = false;
+    var blockedFlag = false;
+    var blockedWords = blockedWordsStr.split("$");
+    smsText = smsText.toLowerCase();
+
+    for (var i = 0; i < blockedWords.length - 1; i++) {
+        var word = blockedWords[i].toLowerCase();
+        //console.log("blockedWords  "+word)
+        if (smsText.includes(word)) {
+            // console.log("blockedWord included "+word)
+            blockedFlag = true;
+            break;
+        }
+    }
+    if (!blockedFlag) {
+        var allowedWords = allowedWordsStr.split("$");
+        for (var i = 0; i < allowedWords.length - 1; i++) {
+            var word = allowedWords[i].toLowerCase();
+            //console.log("allowed  "+word)
+            if (smsText.includes(word)) {
+                // console.log("allowed included "+word)
+                returnFlag = true;
+                break;
+            }
+        }
+    } else {
+        returnFlag = false;
+    }
+    return returnFlag;
+}
+
+function getExpenseDateFromSMS(input) {
+    // converts date from dd-MMM-yyyy to mm/dd/yyyy 
+    var date = new Date(input);
+
+    return (date.getMonth() + 1) + "/" + date.getDate() + "/" + date.getFullYear();
+}
+
+function hideSmartClaims() {
+    /*	if(window.localStorage.getItem("smartClaimsViaSMSOnMobile") == "true"){
+    		document.getElementById('smartClaimsID').style.display="";		
+    	}else{
+    		document.getElementById('smartClaimsID').style.display="none";
+    	}*/
+}
+
+function hideMultilanguage() {
+    if (window.localStorage.getItem("multiLangInMobile") == "true" && document.getElementById('multiLang') != null) {
+        document.getElementById('multiLang').style.display = "block";
+    } else {
+        if (document.getElementById('multiLang') != null) {
+            document.getElementById('multiLang').style.display = "none";
+        }
+    }
+}
+
+function populateMainPage() {
+    j('#loading').show();
+    var headerBackBtn = defaultPagePath + 'categoryMsgPage.html';
+    var pageRef = defaultPagePath + 'category.html';
+
+    j('#mainHeader').load(headerBackBtn);
+    j('#mainContainer').load(pageRef);
+    appPageHistory.push(pageRef);
+    //addEmployeeDetails(data);
+
+    if (window.localStorage.getItem("EaInMobile") != null &&
+        window.localStorage.getItem("EaInMobile")) {
+        synchronizeEAMasterData();
+    }
+
+    if (window.localStorage.getItem("TrRole") != null &&
+        window.localStorage.getItem("TrRole")) {
+        synchronizeTRMasterData();
+        synchronizeTRForTS();
+    }
+    synchronizeBEMasterData();
+
+    if (window.localStorage.getItem("smartClaimsViaSMSOnMobile") != null &&
+        window.localStorage.getItem("smartClaimsViaSMSOnMobile")) {
+        synchronizeWhiteListMasterData();
+        startWatch();
+    }
+
+    j('#loading').hide();
+}
+
+//  *****************************************  Upcoming Trips -- Start  **************************************//
+
+function addTrip() {
+    window.location.href = 'app/pages/trips-info.html';
+}
+
+function clearDiv() {
+
+    document.getElementById('firstDiv').style.display = '';
+    document.getElementById('tabTrip1').style.display = 'none';
+    document.getElementById('tripdet').style.display = 'none';
+    document.getElementById('tabFlight1').style.display = 'none';
+    document.getElementById('flightdet').style.display = 'none';
+    document.getElementById('tabSuccess').style.display = 'none';
+}
+
+function clearDivSync() {
+    document.getElementById('tabTrip1').style.display = 'none';
+    document.getElementById('tripdet').style.display = 'none';
+    document.getElementById('tabFlight1').style.display = 'none';
+    document.getElementById('flightdet').style.display = 'none';
+    document.getElementById('tabSuccess').style.display = 'none';
+}
+
+function clearDivExpense() {
+    document.getElementById('tabTrip1').style.display = 'none';
+    document.getElementById('tripdet').style.display = 'none';
+    document.getElementById('tabFlight1').style.display = 'none';
+    document.getElementById('flightdet').style.display = 'none';
+    document.getElementById('tabSuccess').style.display = 'none';
+}
+
+function clearDivRequest() {
+    document.getElementById('tabTrip1').style.display = 'none';
+    document.getElementById('tripdet').style.display = 'none';
+    document.getElementById('tabFlight1').style.display = 'none';
+    document.getElementById('flightdet').style.display = 'none';
+    document.getElementById('tabSuccess').style.display = 'none';
+}
+
+//  *****************************************  Upcoming Trips -- End  **************************************//
+
+//   ****************************************  Business Edit Page -- Start  ******************************** //
+
+function expPrimaryId() {
+
+    if (j("#source tr.selected").hasClass("selected")) {
+        j("#source tr.selected").each(function(index, row) {
+
+            getPrimaryExpenseId(j(this).find('td.expNameId').text());
+
+        });
+
+    }
+}
+
+function editBusiExpMain(expPrimaryId) {
+
+    var busExpDetailsArr = [];
+    var jsonExpenseDetailsArr = [];
+    expenseClaimDates = new Object;
+    if (j("#source tr.selected").hasClass("selected")) {
+        j("#source tr.selected").each(function(index, row) {
+            if (requestRunning) {
+                return;
+            }
+
+            var busExpDetailId = j(this).find('td.busExpId').text();
+            var jsonFindBE = new Object();
+            var expDate = j(this).find('td.expDate1').text();
+            var expenseDate = expDate;
+            jsonFindBE["busExpDetailId"] = busExpDetailId;
+            jsonFindBE["expenseDate"] = expenseDate;
+            jsonFindBE["accountHeadId"] = j(this).find('td.accHeadId').text();
+            jsonFindBE["accountCodeId"] = j(this).find('td.accountCodeId').text();
+            jsonFindBE["expenseId"] = expPrimaryId;
+            jsonFindBE["ExpenseName"] = j(this).find('td.expName').text();
+            jsonFindBE["fromLocation"] = j(this).find('td.expFromLoc1').text();
+            jsonFindBE["toLocation"] = j(this).find('td.expToLoc1').text();
+            jsonFindBE["narration"] = j(this).find('td.expNarration1').text();
+            if (j(this).find('td.expUnit').text() != "") {
+                jsonFindBE["units"] = j(this).find('td.expUnit').text();
+            }
+            jsonFindBE["wayPoint"] = j(this).find('td.wayPoint').text();
+            jsonFindBE["amount"] = j(this).find('td.expAmt1').text();
+            jsonFindBE["currencyId"] = j(this).find('td.currencyId').text();
+            jsonFindBE["perUnitException"] = j(this).find('td.isEntitlementExceeded').text();
+
+            var dataURL = j(this).find('td.busAttachment').text();
+
+            //For IOS image save
+            //var data = dataURL.replace(/data:image\/(png|jpg|jpeg);base64,/, '');
+
+            //For Android image save
+            var data = dataURL.replace(/data:base64,/, '');
+
+            jsonFindBE["imageAttach"] = data;
+            
+            localStorage.setItem("jsonFindBE", JSON.stringify(jsonFindBE));
+
+            console.log(JSON.stringify(jsonFindBE));
+
+        });
+
+    } else {
+        alert(window.lang.translate('Tap and select Expenses to synch with server.'));
+    }
+
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    var pageRef = defaultPagePath + 'businessExpenseEditPage.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+    appPageHistory.push(pageRef);
+}
+
+function setPerUnitDetailsForEdit(transaction, results) {
+
+    if (results != null) {
+        var row = results.rows.item(0);
+        perUnitDetailsJSON["expenseIsfromAndToReqd"] = row.expIsFromToReq;
+        perUnitDetailsJSON["isUnitReqd"] = row.expIsUnitReq;
+        perUnitDetailsJSON["expRatePerUnit"] = row.expRatePerUnit;
+        perUnitDetailsJSON["expFixedOrVariable"] = row.expFixedOrVariable;
+        perUnitDetailsJSON["expFixedLimitAmt"] = row.expFixedLimitAmt;
+        perUnitDetailsJSON["expenseName"] = row.expName;
+        perUnitDetailsJSON["expPerUnitActiveInative"] = row.expPerUnitActiveInative;
+        perUnitDetailsJSON["isErReqd"] = row.isErReqd;
+        perUnitDetailsJSON["limitAmountForER"] = row.limitAmountForER;
+        perUnitDetailsJSON["isAttachmentReq"] = row.isAttachmentReq;
+        showAttachmentmessage();
+
+        document.getElementById("ratePerUnit").value = row.expRatePerUnit;
+/*        document.getElementById("expAmt").value = "";
+        document.getElementById("expUnit").value = "";
+        document.getElementById("expFromLoc").value = "";
+        document.getElementById("expToLoc").value = "";
+        document.getElementById("expNarration").value = "";
+        document.getElementById("expUnit").value = "";
+        document.getElementById("expAmt").value = "";
+        $(".dropdown-content").hide();
+        fromLocationWayPoint = "";
+        toLocationWayPoint = "";*/
+        if (perUnitDetailsJSON.expenseIsfromAndToReqd == 'N') {
+           document.getElementById("expFromLoc").value = "";
+            document.getElementById("expToLoc").value = "";
+            document.getElementById("expFromLoc").disabled = true;
+            document.getElementById("expToLoc").disabled = true;
+            document.getElementById("expFromLoc").style.backgroundColor = '#d1d1d1';
+            document.getElementById("expToLoc").style.backgroundColor = '#d1d1d1';
+            document.getElementById("expNarration").disabled = false;
+            document.getElementById("expNarration").style.backgroundColor = '#FFFFFF';
+            document.getElementById("mapImage").style.display = "none";
+            $(".dropdown-content").hide();
+            fromLocationWayPoint = "";
+            toLocationWayPoint = "";
+        } else {
+            document.getElementById("expFromLoc").disabled = false;
+            document.getElementById("expToLoc").disabled = false;
+/*          document.getElementById("expFromLoc").value = "";
+            document.getElementById("expToLoc").value = "";
+            document.getElementById("expNarration").value = "";*/
+            document.getElementById("expFromLoc").style.backgroundColor = '#FFFFFF';
+            document.getElementById("expToLoc").style.backgroundColor = '#FFFFFF';
+            $(".dropdown-content").hide();
+            fromLocationWayPoint = "";
+            toLocationWayPoint = "";
+            if (window.localStorage.getItem("MobileMapRole") == 'true') {
+                if (window.localStorage.getItem("MapProvider") == "GOOGLEMAP") {
+                    attachGoogleSearchBox(document.getElementById("expFromLoc"));
+                    attachGoogleSearchBox(document.getElementById("expToLoc"));
+                }
+                document.getElementById("mapImage").style.display = "";
+                document.getElementById("expNarration").disabled = true;
+                document.getElementById("expNarration").style.backgroundColor = '#d1d1d1';
+            }
+        }
+        if (perUnitDetailsJSON.isUnitReqd == 'Y') {
+            document.getElementById("expAmt").value = "";
+            if (perUnitDetailsJSON.expFixedOrVariable == 'V') {
+                flagForUnitEnable = true;
+                if (perUnitDetailsJSON.expenseIsfromAndToReqd == 'Y' && window.localStorage.getItem("MobileMapRole") == 'true') {
+                    document.getElementById("expUnit").disabled = true;
+                    document.getElementById("expUnit").style.backgroundColor = '#d1d1d1';
+                } else {
+                    document.getElementById("expUnit").disabled = false;
+                    document.getElementById("expUnit").style.backgroundColor = '#FFFFFF';
+                }
+                document.getElementById("expAmt").disabled = false;
+                document.getElementById("expAmt").style.backgroundColor = '#FFFFFF';
+            } else {
+                flagForUnitEnable = true;
+                if (perUnitDetailsJSON.expenseIsfromAndToReqd == 'Y' && window.localStorage.getItem("MobileMapRole") == 'true') {
+                    document.getElementById("expUnit").disabled = true;
+                    document.getElementById("expUnit").style.backgroundColor = '#d1d1d1';
+                } else {
+                    document.getElementById("expUnit").disabled = false;
+                    document.getElementById("expUnit").style.backgroundColor = '#FFFFFF';
+                }
+                document.getElementById("expAmt").disabled = true;
+                document.getElementById("expAmt").style.backgroundColor = '#d1d1d1';
+            }
+        } else {
+            flagForUnitEnable = false;
+            document.getElementById("expUnit").disabled = true;
+            document.getElementById("expUnit").style.backgroundColor = '#d1d1d1';
+            document.getElementById("expAmt").disabled = false;
+            document.getElementById("expAmt").style.backgroundColor = '#FFFFFF';
+        }
+        if (perUnitDetailsJSON.expPerUnitActiveInative == '1') {
+            flagForUnitEnable = false;
+            document.getElementById("expUnit").disabled = true;
+            document.getElementById("expAmt").disabled = false;
+            document.getElementById("expAmt").style.backgroundColor = '#FFFFFF';
+            document.getElementById("expUnit").style.backgroundColor = '#d1d1d1';
+        }
+    } else {
+
+        alert("Please Synch your expense Names to claim expense.");
+    }
+
+}
+
+
+//   ****************************************  Business Edit Page -- End  ******************************** //
+
+// ****************************************** Approval Pages -- Start  *********************************** //
+
+
+function voucherDetails(loadDiv) {
+    enableDiv = loadDiv;
+    resetImageData();
+    var headerBackBtn = defaultPagePath + 'backbtnPage.html';
+    var pageRef = defaultPagePath + 'voucherDetails.html';
+    j(document).ready(function() {
+        j('#mainHeader').load(headerBackBtn);
+        j('#mainContainer').load(pageRef);
+    });
+
+    appPageHistory.push(pageRef);
+}
+
+// ****************************************** Approval Pages -- Start  *********************************** //
