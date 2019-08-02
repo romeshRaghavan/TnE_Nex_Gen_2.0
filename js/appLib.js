@@ -4160,14 +4160,11 @@
          });
 
          alert("Record update successfully");
-         resetUpdateImage();
-         resetImageData();
 
      } else {
          alert("db not found, your browser does not support web sql!");
      }
      viewBusinessExp();
-
       }
  }
 
