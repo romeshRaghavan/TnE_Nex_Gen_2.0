@@ -161,6 +161,9 @@
          t.executeSql("CREATE TABLE IF NOT EXISTS perDiemTravelMst (ID INTEGER PRIMARY KEY ASC, companyId INTEGER, gradeId INTEGER, amount INTEGER, domCityTownId INTEGER, expenseHeadId INTEGER, currencyId INTEGER)");
          t.executeSql("CREATE TABLE IF NOT EXISTS profileMst (profileId INTEGER PRIMARY KEY ASC AUTOINCREMENT,empId INTEGER, profileAttachment  BLOB)");
 
+t.executeSql("CREATE TABLE IF NOT EXISTS businessExpDetails (ID INTEGER PRIMARY KEY ASC , busExpId INTEGER , accHeadId INTEGER REFERENCES accountHeadMst(accHeadId), expNameId INTEGER REFERENCES expNameMst(expNameId),expDate DATE, expFromLoc TEXT, expToLoc TEXT, expNarration TEXT, expUnit INTEGER, expAmt Double, currencyId INTEGER REFERENCES currencyMst(currencyId),isEntitlementExceeded TEXT,busExpAttachment BLOB,wayPointunitValue TEXT)");
+
+
      });
  } else {
      alert(window.lang.translate('WebSQL is not supported by your browser!'));
@@ -4106,9 +4109,6 @@
 
      var exp_amt = document.getElementById('expAmt').value;
 
-     alert("fileTempGalleryBE : "+fileTempGalleryBE);
-     alert("fileTempCameraBE : "+fileTempCameraBE);
-
 /*     if (fileTempGalleryBE == undefined || fileTempGalleryBE == "") {
      } else if(fileTempGalleryBE != ""){
         alert("in else gal ");
@@ -4120,10 +4120,8 @@
         alert("in else cam ");
          file = fileTempCameraBE;
      }*/
-     alert("updateAttachment : "+updateAttachment);
 
      if(updateAttachment != "" && updateAttachment != undefined){
-        alert("in");
             file = updateAttachment;
      }else{
          if (fileTempGalleryBE == undefined || fileTempGalleryBE == "") {
