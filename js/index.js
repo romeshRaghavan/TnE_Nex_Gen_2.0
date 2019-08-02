@@ -297,6 +297,7 @@ function isJsonString(str) {
 }
 
 function viewBusinessExp() {
+
     var pageRef = defaultPagePath + 'fairClaimTable.html';
     //var headerBackBtn=defaultPagePath+'headerPageForBEOperation.html';
     j(document).ready(function() {
